@@ -26,10 +26,11 @@ let chests = [];
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
 let velocity, direction, clock, loader;
 
+let isPaused = false;
+
 function initThree() {
     console.log("Inizializzazione Three.js...");
     
-    // Inizializza variabili Three.js se non già fatto
     if (!velocity) velocity = new THREE.Vector3();
     if (!direction) direction = new THREE.Vector3();
     if (!clock) clock = new THREE.Clock();
@@ -39,30 +40,22 @@ function initThree() {
         return;
     }
 
-    // Pulisci il container se esiste già un renderer
-    if (animationId) {
-        cancelAnimationFrame(animationId);
-    }
-    while (container.firstChild) {
-        container.removeChild(container.firstChild);
-    }
+    if (animationId) cancelAnimationFrame(animationId);
+    while (container.firstChild) container.removeChild(container.firstChild);
 
     try {
         if (typeof THREE.GLTFLoader === 'undefined') {
-            throw new Error("GLTFLoader non trovato. Verifica lo script nel file index.html");
+            throw new Error("GLTFLoader non trovato.");
         }
         loader = new THREE.GLTFLoader();
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a472a);
         scene.fog = new THREE.FogExp2(0x1a472a, 0.002);
 
-        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, GameSettings.graphics.lodDistance);
         
-        renderer = new THREE.WebGLRenderer({ antialias: false });
-        const width = container.clientWidth || window.innerWidth;
-        const height = container.clientHeight || window.innerHeight;
-        renderer.setSize(width, height);
-        renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1 : 1);
+        renderer = new THREE.WebGLRenderer({ antialias: GameSettings.graphics.antialias });
+        GameSettings.apply(renderer, camera);
         container.appendChild(renderer.domElement);
 
         window.addEventListener('resize', onWindowResize, false);
@@ -146,6 +139,29 @@ function spawn3DChest() {
     chests.push(chest);
 }
 
+function handleGamepadInput() {
+    if (!GameSettings.gamepad.enabled) return;
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    const gp = gamepads[0];
+    if (!gp) return;
+
+    const deadzone = GameSettings.gamepad.deadzone;
+    
+    // Movimento con analogico sinistro
+    const xAxis = gp.axes[0];
+    const yAxis = gp.axes[1];
+
+    moveLeft = xAxis < -deadzone;
+    moveRight = xAxis > deadzone;
+    moveForward = yAxis < -deadzone;
+    moveBackward = yAxis > deadzone;
+
+    // Pausa con tasto Start (tipicamente indice 9 o 16)
+    if (gp.buttons[9]?.pressed || gp.buttons[16]?.pressed) {
+        if (!isPaused) togglePause();
+    }
+}
+
 function onWindowResize() {
     if (!camera || !renderer || !screens.exploration) return;
     const container = document.getElementById('three-container');
@@ -157,31 +173,40 @@ function onWindowResize() {
 }
 
 function onKeyDown(event) {
+    if (event.code === GameSettings.controls.pause) {
+        togglePause();
+        return;
+    }
+    if (isPaused) return;
+
     switch (event.code) {
-        case 'ArrowUp': case 'KeyW': moveForward = true; break;
-        case 'ArrowLeft': case 'KeyA': moveLeft = true; break;
-        case 'ArrowDown': case 'KeyS': moveBackward = true; break;
-        case 'ArrowRight': case 'KeyD': moveRight = true; break;
+        case GameSettings.controls.forward: moveForward = true; break;
+        case GameSettings.controls.left: moveLeft = true; break;
+        case GameSettings.controls.backward: moveBackward = true; break;
+        case GameSettings.controls.right: moveRight = true; break;
     }
 }
 
 function onKeyUp(event) {
     switch (event.code) {
-        case 'ArrowUp': case 'KeyW': moveForward = false; break;
-        case 'ArrowLeft': case 'KeyA': moveLeft = false; break;
-        case 'ArrowDown': case 'KeyS': moveBackward = false; break;
-        case 'ArrowRight': case 'KeyD': moveRight = false; break;
+        case GameSettings.controls.forward: moveForward = false; break;
+        case GameSettings.controls.left: moveLeft = false; break;
+        case GameSettings.controls.backward: moveBackward = false; break;
+        case GameSettings.controls.right: moveRight = false; break;
     }
 }
 
 let animationId;
 
 function animate() {
-    if (!scene) return;
+    if (!scene || isPaused) return;
     animationId = requestAnimationFrame(animate);
 
     const delta = clock.getDelta();
     
+    // Supporto Gamepad
+    handleGamepadInput();
+
     if (mixer) mixer.update(delta);
 
     if (playerMesh) {
@@ -189,7 +214,7 @@ function animate() {
         velocity.z -= velocity.z * 10.0 * delta;
 
         direction.z = Number(moveForward) - Number(moveBackward);
-        direction.x = Number(moveRight) - Number(moveLeft);
+        direction.x = Number(moveLeft) - Number(moveRight); // Corretto: Left e Right erano invertiti per la logica 3D standard
         direction.normalize();
 
         if (moveForward || moveBackward) velocity.z -= direction.z * 4000.0 * delta;
@@ -254,7 +279,9 @@ async function init() {
         exploration: document.getElementById('exploration-screen'),
         hunt: document.getElementById('hunt-screen'),
         shop: document.getElementById('shop-screen'),
-        character: document.getElementById('character-screen')
+        character: document.getElementById('character-screen'),
+        pause: document.getElementById('pause-screen'),
+        settings: document.getElementById('settings-screen')
     };
 
     try {
@@ -274,8 +301,67 @@ async function init() {
     }
 }
 
+function togglePause() {
+    isPaused = !isPaused;
+    if (isPaused) {
+        showScreen('pause');
+        if (animationId) cancelAnimationFrame(animationId);
+    } else {
+        showScreen('exploration');
+        animate();
+    }
+}
+
 function setupEventListeners() {
     console.log("Configurazione event listeners...");
+    
+    // Menu di Pausa e Navigazione
+    const btnPause = document.getElementById('pause-btn');
+    if (btnPause) btnPause.onclick = togglePause;
+
+    const btnResume = document.getElementById('resume-btn');
+    if (btnResume) btnResume.onclick = () => togglePause();
+
+    const btnSettings = document.getElementById('settings-btn');
+    if (btnSettings) btnSettings.onclick = () => {
+        showScreen('settings');
+        updateSettingsUI();
+    };
+
+    const btnBackToPause = document.querySelector('.back-to-pause-btn');
+    if (btnBackToPause) btnBackToPause.onclick = () => showScreen('pause');
+
+    const btnQuit = document.getElementById('quit-btn');
+    if (btnQuit) btnQuit.onclick = () => {
+        isPaused = false;
+        showScreen('menu');
+    };
+
+    // Salva/Carica nel menu di pausa
+    const btnPauseSave = document.getElementById('pause-save-btn');
+    if (btnPauseSave) btnPauseSave.onclick = saveGame;
+
+    const btnPauseLoad = document.getElementById('pause-load-btn');
+    if (btnPauseLoad) btnPauseLoad.onclick = loadGame;
+
+    // Impostazioni Grafiche
+    document.getElementById('res-scale').oninput = (e) => {
+        GameSettings.graphics.resolutionScale = parseFloat(e.target.value);
+        GameSettings.apply(renderer, camera);
+        GameSettings.save();
+    };
+
+    document.getElementById('lod-dist').oninput = (e) => {
+        GameSettings.graphics.lodDistance = parseInt(e.target.value);
+        GameSettings.apply(renderer, camera);
+        GameSettings.save();
+    };
+
+    document.getElementById('target-fps').onchange = (e) => {
+        GameSettings.graphics.targetFPS = parseInt(e.target.value);
+        GameSettings.save();
+    };
+
     const btnNewGame = document.getElementById('new-game-btn');
     if (btnNewGame) {
         btnNewGame.onclick = () => {
@@ -319,6 +405,21 @@ function setupEventListeners() {
     document.querySelectorAll('.buy-crypto').forEach(btn => {
         btn.onclick = () => handleCryptoPayment(btn.dataset.amount, btn.dataset.reward);
     });
+}
+
+function updateSettingsUI() {
+    document.getElementById('res-scale').value = GameSettings.graphics.resolutionScale;
+    document.getElementById('lod-dist').value = GameSettings.graphics.lodDistance;
+    document.getElementById('target-fps').value = GameSettings.graphics.targetFPS;
+
+    const bindings = document.getElementById('key-bindings');
+    bindings.innerHTML = '';
+    for (let action in GameSettings.controls) {
+        const div = document.createElement('div');
+        div.className = 'key-row';
+        div.innerHTML = `<span>${action.toUpperCase()}</span> <span>${GameSettings.controls[action]}</span>`;
+        bindings.appendChild(div);
+    }
 }
 
 function startNewGame() {

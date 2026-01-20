@@ -100,6 +100,66 @@ header h1 {
 
 #three-container canvas {
     display: block;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* --- UI Overlays --- */
+.game-ui-overlay {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 100;
+}
+
+.menu-options {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: center;
+    padding: 20px;
+}
+
+.settings-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+    overflow-y: auto;
+    max-height: 60vh;
+}
+
+.settings-content h3 {
+    color: var(--rpg-gold);
+    border-bottom: 2px solid var(--rpg-border);
+    margin-bottom: 10px;
+    font-size: 0.8rem;
+}
+
+.settings-content label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.6rem;
+    margin-bottom: 10px;
+}
+
+#key-bindings {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.key-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px;
+    background: rgba(255,255,255,0.1);
+}
+
+.key-row span {
+    font-size: 0.5rem;
 }
 
 canvas {
