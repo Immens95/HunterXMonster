@@ -42,6 +42,9 @@ function initThree() {
     }
 
     try {
+        if (typeof THREE.GLTFLoader === 'undefined') {
+            throw new Error("GLTFLoader non trovato. Verifica lo script nel file index.html");
+        }
         loader = new THREE.GLTFLoader();
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a472a);
@@ -218,6 +221,13 @@ let screens = {};
 async function init() {
     console.log("Inizializzazione gioco...");
     
+    // Verifica caricamento librerie critiche
+    if (typeof THREE === 'undefined') {
+        console.error("Errore: Three.js non caricato!");
+        alert("Errore caricamento motore 3D. Controlla la connessione.");
+        return;
+    }
+
     // Inizializza i riferimenti agli schermi DOM
     screens = {
         menu: document.getElementById('menu-screen'),
