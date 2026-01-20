@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hunter X Monster - RPG Edition</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#000080">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Overlay CRT per stile retro -->
+        <div class="crt-overlay"></div>
+        
+        <header>
+            <h1>Hunter X Monster</h1>
+            <div id="stats-bar">
+                <div class="stat-item"><img src="assets/sprites/heart.png" class="stat-icon"> LV: <span id="player-level">1</span></div>
+                <div class="stat-item">NEN: <span id="player-nen">Nessuno</span></div>
+                <div class="stat-item">ZENY: <span id="player-zeny">0</span></div>
+            </div>
+        </header>
+
+        <main id="game-screen">
+            <!-- Schermata Iniziale -->
+            <div id="menu-screen" class="screen">
+                <button id="new-game-btn">Nuova Partita</button>
+                <button id="load-game-btn">Carica Partita</button>
+                <button id="shop-btn">Negozio Crypto</button>
+            </div>
+
+            <!-- Esplorazione 3D (Three.js) -->
+            <div id="exploration-screen" class="screen hidden">
+                <div id="three-container"></div>
+                <div class="save-load-menu">
+                    <button id="menu-save-btn">Salva</button>
+                    <button id="char-menu-btn">Menu</button>
+                </div>
+            </div>
+
+            <!-- Battaglia -->
+            <div id="hunt-screen" class="screen hidden">
+                <div id="monster-info">
+                    <h2 id="monster-name">Mostro</h2>
+                    <div class="hp-bar-container">
+                        <div id="monster-hp" class="hp-bar"></div>
+                    </div>
+                </div>
+                <div id="battle-log"></div>
+                <div id="battle-actions">
+                    <button id="attack-btn">Attacca</button>
+                    <button id="nen-btn">Nen Skill</button>
+                    <button id="flee-btn">Fuggi</button>
+                </div>
+            </div>
+
+            <!-- Menu Personaggio -->
+            <div id="character-screen" class="screen hidden">
+                <h2>Stato Cacciatore</h2>
+                <div id="char-stats">
+                    <div class="stat-row"><span>HP:</span> <span id="stat-hp">0/0</span></div>
+                    <div class="stat-row"><span>Attacco:</span> <span id="stat-atk">0</span></div>
+                    <div class="stat-row"><span>Difesa:</span> <span id="stat-def">0</span></div>
+                    <div class="stat-row"><span>XP:</span> <span id="stat-xp">0</span></div>
+                    <div class="stat-row"><span>Nen:</span> <span id="stat-nen-type">-</span></div>
+                </div>
+                <button class="back-to-map-btn">Torna alla Mappa</button>
+            </div>
+
+            <!-- Negozio -->
+            <div id="shop-screen" class="screen hidden">
+                <h2>Negozio Crypto</h2>
+                <div class="shop-item">
+                    <span>1000 Zeny - 0.01 ETH</span>
+                    <button class="buy-crypto" data-amount="0.01" data-reward="1000">Compra</button>
+                </div>
+                <button class="back-btn">Indietro</button>
+            </div>
+        <footer>
+            <button id="install-btn" style="display: none;">Installa App</button>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <script src="js/pwa.js"></script>
+    <script src="js/maps.js"></script>
+    <script src="js/enemies.js"></script>
+    <script src="js/items.js"></script>
+    <script src="js/inventory.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>
