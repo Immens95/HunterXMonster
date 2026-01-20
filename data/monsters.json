@@ -1,0 +1,29 @@
+[
+    {
+        "id": 1,
+        "name": "Jagras della Foresta",
+        "hp": 100,
+        "maxHp": 100,
+        "attack": 10,
+        "reward": 100,
+        "exp": 50
+    },
+    {
+        "id": 2,
+        "name": "Rathalos Rosso",
+        "hp": 500,
+        "maxHp": 500,
+        "attack": 45,
+        "reward": 1000,
+        "exp": 500
+    },
+    {
+        "id": 3,
+        "name": "Chimera Ant Soldier",
+        "hp": 250,
+        "maxHp": 250,
+        "attack": 25,
+        "reward": 400,
+        "exp": 200
+    }
+]
