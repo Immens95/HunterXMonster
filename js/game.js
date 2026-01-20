@@ -1,6 +1,4 @@
 // --- Game Configuration & Constants ---
-
-let phaserGame;
 let player = {
     level: 1,
     exp: 0,
@@ -20,80 +18,106 @@ let player = {
 let scene, camera, renderer, playerMesh, npcMesh, mixer;
 let chests = [];
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-let velocity = new THREE.Vector3();
-let direction = new THREE.Vector3();
-const loader = new THREE.GLTFLoader();
-const clock = new THREE.Clock();
+let velocity, direction, clock, loader;
 
 function initThree() {
-    const container = document.getElementById('three-container');
-    if (!container) return;
-
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a472a);
-    scene.fog = new THREE.FogExp2(0x1a472a, 0.002);
-
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+    console.log("Inizializzazione Three.js...");
     
-    renderer = new THREE.WebGLRenderer({ antialias: false });
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1 : 1);
-    container.appendChild(renderer.domElement);
-
-    // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    directionalLight.position.set(10, 50, 10);
-    scene.add(directionalLight);
-
-    // Floor with texture
-    const textureLoader = new THREE.TextureLoader();
-    const grassTexture = textureLoader.load('assets/textures/grass.jpg');
-    grassTexture.wrapS = THREE.RepeatWrapping;
-    grassTexture.wrapT = THREE.RepeatWrapping;
-    grassTexture.repeat.set(50, 50);
-
-    const floorGeo = new THREE.PlaneGeometry(MAP_CONFIG.MAP_WIDTH * MAP_CONFIG.TILE_SIZE * 2, MAP_CONFIG.MAP_HEIGHT * MAP_CONFIG.TILE_SIZE * 2);
-    const floorMat = new THREE.MeshLambertMaterial({ map: grassTexture });
-    const floor = new THREE.Mesh(floorGeo, floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    scene.add(floor);
-
-    // Load Player Model
-    loader.load('assets/models/player.glb', (gltf) => {
-        playerMesh = gltf.scene;
-        playerMesh.scale.set(40, 40, 40);
-        playerMesh.position.set(player.x, 0, player.y);
-        scene.add(playerMesh);
-        
-        // Setup animations if available
-        if (gltf.animations && gltf.animations.length > 0) {
-            mixer = new THREE.AnimationMixer(playerMesh);
-            mixer.clipAction(gltf.animations[0]).play(); // Play first animation (usually idle or walk)
-        }
-    });
-
-    // Load NPC Model
-    loader.load('assets/models/npc.glb', (gltf) => {
-        npcMesh = gltf.scene;
-        npcMesh.scale.set(40, 40, 40);
-        npcMesh.position.set(15 * MAP_CONFIG.TILE_SIZE, 0, 15 * MAP_CONFIG.TILE_SIZE);
-        scene.add(npcMesh);
-    });
-
-    // Chests (keep as cubes for now but maybe add texture)
-    for(let i=0; i<15; i++) {
-        spawn3DChest();
+    // Inizializza variabili Three.js se non già fatto
+    if (!velocity) velocity = new THREE.Vector3();
+    if (!direction) direction = new THREE.Vector3();
+    if (!clock) clock = new THREE.Clock();
+    const container = document.getElementById('three-container');
+    if (!container) {
+        console.error("Container 'three-container' non trovato!");
+        return;
     }
 
-    camera.position.set(player.x, 400, player.y + 400);
-    camera.lookAt(player.x, 0, player.y);
+    // Pulisci il container se esiste già un renderer
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+    }
+    while (container.firstChild) {
+        container.removeChild(container.firstChild);
+    }
 
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    
-    animate();
+    try {
+        loader = new THREE.GLTFLoader();
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a472a);
+        scene.fog = new THREE.FogExp2(0x1a472a, 0.002);
+
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+        
+        renderer = new THREE.WebGLRenderer({ antialias: false });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1 : 1);
+        container.appendChild(renderer.domElement);
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        directionalLight.position.set(10, 50, 10);
+        scene.add(directionalLight);
+
+        // Floor with texture
+        const textureLoader = new THREE.TextureLoader();
+        const grassTexture = textureLoader.load('assets/textures/grass.jpg');
+        grassTexture.wrapS = THREE.RepeatWrapping;
+        grassTexture.wrapT = THREE.RepeatWrapping;
+        grassTexture.repeat.set(50, 50);
+
+        const floorGeo = new THREE.PlaneGeometry(MAP_CONFIG.MAP_WIDTH * MAP_CONFIG.TILE_SIZE * 2, MAP_CONFIG.MAP_HEIGHT * MAP_CONFIG.TILE_SIZE * 2);
+        const floorMat = new THREE.MeshLambertMaterial({ map: grassTexture });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+        // Load Player Model
+        loader.load('assets/models/player.glb', (gltf) => {
+            playerMesh = gltf.scene;
+            playerMesh.scale.set(40, 40, 40);
+            playerMesh.position.set(player.x, 0, player.y);
+            scene.add(playerMesh);
+            
+            if (gltf.animations && gltf.animations.length > 0) {
+                mixer = new THREE.AnimationMixer(playerMesh);
+                mixer.clipAction(gltf.animations[0]).play();
+            }
+        }, undefined, (error) => {
+            console.error("Errore caricamento modello player:", error);
+        });
+
+        // Load NPC Model
+        loader.load('assets/models/npc.glb', (gltf) => {
+            npcMesh = gltf.scene;
+            npcMesh.scale.set(40, 40, 40);
+            npcMesh.position.set(15 * MAP_CONFIG.TILE_SIZE, 0, 15 * MAP_CONFIG.TILE_SIZE);
+            scene.add(npcMesh);
+        }, undefined, (error) => {
+            console.error("Errore caricamento modello NPC:", error);
+        });
+
+        // Chests
+        chests = [];
+        for(let i=0; i<15; i++) {
+            spawn3DChest();
+        }
+
+        camera.position.set(player.x, 400, player.y + 400);
+        camera.lookAt(player.x, 0, player.y);
+
+        window.removeEventListener('keydown', onKeyDown);
+        window.removeEventListener('keyup', onKeyUp);
+        window.addEventListener('keydown', onKeyDown);
+        window.addEventListener('keyup', onKeyUp);
+        
+        animate();
+        console.log("Three.js inizializzato correttamente.");
+    } catch (e) {
+        console.error("Errore durante l'inizializzazione di Three.js:", e);
+    }
 }
 
 function spawn3DChest() {
@@ -127,9 +151,11 @@ function onKeyUp(event) {
     }
 }
 
+let animationId;
+
 function animate() {
     if (!scene) return;
-    requestAnimationFrame(animate);
+    animationId = requestAnimationFrame(animate);
 
     const delta = clock.getDelta();
     
@@ -187,22 +213,48 @@ function animate() {
 }
 
 // --- DOM & Game State Management ---
-const screens = {
-    menu: document.getElementById('menu-screen'),
-    exploration: document.getElementById('exploration-screen'),
-    hunt: document.getElementById('hunt-screen'),
-    shop: document.getElementById('shop-screen'),
-    character: document.getElementById('character-screen')
-};
+let screens = {};
 
 async function init() {
-    await loadMonsters();
-    setupEventListeners();
+    console.log("Inizializzazione gioco...");
+    
+    // Inizializza i riferimenti agli schermi DOM
+    screens = {
+        menu: document.getElementById('menu-screen'),
+        exploration: document.getElementById('exploration-screen'),
+        hunt: document.getElementById('hunt-screen'),
+        shop: document.getElementById('shop-screen'),
+        character: document.getElementById('character-screen')
+    };
+
+    try {
+        // Configura i listener PRIMA del caricamento dei dati
+        setupEventListeners();
+        
+        // Carica i mostri in background
+        loadMonsters().then(() => {
+            console.log("Mostri caricati correttamente.");
+        }).catch(e => {
+            console.warn("Errore durante il caricamento dei mostri, uso dati di fallback.", e);
+        });
+
+        console.log("Gioco inizializzato correttamente.");
+    } catch (e) {
+        console.error("Errore durante l'inizializzazione del gioco:", e);
+    }
 }
 
 function setupEventListeners() {
+    console.log("Configurazione event listeners...");
     const btnNewGame = document.getElementById('new-game-btn');
-    if (btnNewGame) btnNewGame.onclick = startNewGame;
+    if (btnNewGame) {
+        btnNewGame.onclick = () => {
+            console.log("Pulsante Nuova Partita cliccato");
+            startNewGame();
+        };
+    } else {
+        console.warn("Pulsante 'new-game-btn' non trovato!");
+    }
 
     const btnLoadGame = document.getElementById('load-game-btn');
     if (btnLoadGame) btnLoadGame.onclick = loadGame;
@@ -240,14 +292,20 @@ function setupEventListeners() {
 }
 
 function startNewGame() {
-    player = {
-        level: 1, exp: 0, nen: 'Nessuno', zeny: 0, hp: 100, maxHp: 100,
-        attack: 15, defense: 5, x: 20 * MAP_CONFIG.TILE_SIZE, y: 20 * MAP_CONFIG.TILE_SIZE,
-        exploredMap: []
-    };
-    updateUI();
-    initThree();
-    showScreen('exploration');
+    console.log("Avvio nuova partita...");
+    try {
+        player = {
+            level: 1, exp: 0, nen: 'Nessuno', zeny: 0, hp: 100, maxHp: 100,
+            attack: 15, defense: 5, x: 20 * MAP_CONFIG.TILE_SIZE, y: 20 * MAP_CONFIG.TILE_SIZE,
+            exploredMap: [], inventory: []
+        };
+        updateUI();
+        initThree();
+        showScreen('exploration');
+        console.log("Nuova partita avviata.");
+    } catch (e) {
+        console.error("Errore durante l'avvio della nuova partita:", e);
+    }
 }
 
 function saveGame() {
@@ -258,10 +316,16 @@ function saveGame() {
 function loadGame() {
     const saved = localStorage.getItem('hxm_v3_save');
     if (saved) {
-        player = JSON.parse(saved);
-        updateUI();
-        initThree();
-        showScreen('exploration');
+        try {
+            player = JSON.parse(saved);
+            updateUI();
+            initThree();
+            showScreen('exploration');
+            console.log("Salvataggio caricato.");
+        } catch (e) {
+            console.error("Errore nel caricamento del salvataggio:", e);
+            alert("Salvataggio corrotto.");
+        }
     } else {
         alert("Nessun salvataggio trovato.");
     }
@@ -269,10 +333,13 @@ function loadGame() {
 
 
 function showScreen(name) {
+    console.log(`Cambio schermata in: ${name}`);
     Object.values(screens).forEach(s => s?.classList.add('hidden'));
-    screens[name]?.classList.remove('hidden');
-    
-    // Resume 3D if needed
+    if (screens[name]) {
+        screens[name].classList.remove('hidden');
+    } else {
+        console.error(`Schermata '${name}' non trovata!`);
+    }
 }
 
 function updateUI() {
@@ -283,6 +350,10 @@ function updateUI() {
 
 // --- Battle System (Phaser integrated) ---
 function startHunt() {
+    if (!monsters || monsters.length === 0) {
+        console.warn("Nessun mostro caricato, impossibile iniziare la caccia.");
+        return;
+    }
     const randomIndex = Math.floor(Math.random() * monsters.length);
     currentMonster = { ...monsters[randomIndex] };
     
@@ -375,4 +446,5 @@ async function handleCryptoPayment(amount, reward) {
     } else { alert("MetaMask non trovato."); }
 }
 
-init();
+// Avvia il gioco al caricamento della pagina
+window.addEventListener('DOMContentLoaded', init);
