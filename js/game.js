@@ -1,3 +1,9 @@
+// Gestore errori globale per il debug
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+    console.error('Errore Globale: ' + msg + '\nURL: ' + url + '\nLinea: ' + lineNo + '\nColonna: ' + columnNo + '\nErrore: ' + error);
+    return false;
+};
+
 // --- Game Configuration & Constants ---
 let player = {
     level: 1,
@@ -53,9 +59,13 @@ function initThree() {
         camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
         
         renderer = new THREE.WebGLRenderer({ antialias: false });
-        renderer.setSize(container.clientWidth, container.clientHeight);
+        const width = container.clientWidth || window.innerWidth;
+        const height = container.clientHeight || window.innerHeight;
+        renderer.setSize(width, height);
         renderer.setPixelRatio(window.devicePixelRatio > 1 ? 1 : 1);
         container.appendChild(renderer.domElement);
+
+        window.addEventListener('resize', onWindowResize, false);
 
         // Lights
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -134,6 +144,16 @@ function spawn3DChest() {
     );
     scene.add(chest);
     chests.push(chest);
+}
+
+function onWindowResize() {
+    if (!camera || !renderer || !screens.exploration) return;
+    const container = document.getElementById('three-container');
+    if (!container) return;
+    
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
 }
 
 function onKeyDown(event) {
@@ -310,8 +330,11 @@ function startNewGame() {
             exploredMap: [], inventory: []
         };
         updateUI();
-        initThree();
         showScreen('exploration');
+        // Piccolo ritardo per assicurarsi che il DOM sia aggiornato e le dimensioni siano corrette
+        requestAnimationFrame(() => {
+            initThree();
+        });
         console.log("Nuova partita avviata.");
     } catch (e) {
         console.error("Errore durante l'avvio della nuova partita:", e);
@@ -329,8 +352,10 @@ function loadGame() {
         try {
             player = JSON.parse(saved);
             updateUI();
-            initThree();
             showScreen('exploration');
+            requestAnimationFrame(() => {
+                initThree();
+            });
             console.log("Salvataggio caricato.");
         } catch (e) {
             console.error("Errore nel caricamento del salvataggio:", e);
