@@ -13,6 +13,17 @@
         <!-- Overlay CRT per stile retro -->
         <div class="crt-overlay"></div>
         
+        <!-- Schermata di Caricamento -->
+        <div id="loading-screen">
+            <div class="loading-content">
+                <h2>Caricamento...</h2>
+                <div id="loading-bar">
+                    <div id="loading-bar-fill"></div>
+                </div>
+                <p id="loading-text">Inizializzazione motore 3D...</p>
+            </div>
+        </div>
+        
         <header>
             <h1>Hunter X Monster</h1>
             <div id="stats-bar">
@@ -136,15 +147,15 @@
         </footer>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js" defer></script>
     <script src="js/lib/three.min.js"></script>
     <script src="js/lib/GLTFLoader.js"></script>
     <script src="js/settings.js"></script>
-    <script src="js/pwa.js"></script>
-    <script src="js/maps.js"></script>
-    <script src="js/enemies.js"></script>
-    <script src="js/items.js"></script>
-    <script src="js/inventory.js"></script>
-    <script src="js/game.js"></script>
+    <script src="js/pwa.js" defer></script>
+    <script src="js/maps.js" defer></script>
+    <script src="js/enemies.js" defer></script>
+    <script src="js/items.js" defer></script>
+    <script src="js/inventory.js" defer></script>
+    <script src="js/game.js" defer></script>
 </body>
 </html>

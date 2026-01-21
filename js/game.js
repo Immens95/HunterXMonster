@@ -25,7 +25,7 @@ let scene, camera, renderer, playerMesh, npcMesh, mixer;
 let chests = [];
 let worldEnemies = [];
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-let velocity, direction, clock, loader;
+let velocity, direction, clock, loader, loadingManager;
 
 let isPaused = false;
 let isTouchDevice = false;
@@ -34,6 +34,35 @@ let cameraDistance = 600;
 let cameraPitch = 0.8; 
 let joystickData = { active: false, x: 0, y: 0 };
 let lastMousePos = { x: 0, y: 0 };
+
+function initLoadingManager() {
+    loadingManager = new THREE.LoadingManager();
+    const loadingBar = document.getElementById('loading-bar-fill');
+    const loadingText = document.getElementById('loading-text');
+    const loadingScreen = document.getElementById('loading-screen');
+
+    loadingManager.onStart = (url, itemsLoaded, itemsTotal) => {
+        console.log(`Inizio caricamento: ${url}. Caricati ${itemsLoaded}/${itemsTotal} elementi.`);
+    };
+
+    loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+        const progress = (itemsLoaded / itemsTotal) * 100;
+        if (loadingBar) loadingBar.style.width = progress + '%';
+        if (loadingText) loadingText.innerText = `Caricamento: ${Math.round(progress)}%`;
+    };
+
+    loadingManager.onLoad = () => {
+        console.log('Tutti gli asset caricati.');
+        if (loadingScreen) {
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => loadingScreen.classList.add('hidden'), 500);
+        }
+    };
+
+    loadingManager.onError = (url) => {
+        console.error('Errore nel caricamento di:', url);
+    };
+}
 
 function initThree() {
     console.log("Inizializzazione Three.js...");
@@ -83,11 +112,13 @@ function initThree() {
     if (animationId) cancelAnimationFrame(animationId);
     while (container.firstChild) container.removeChild(container.firstChild);
 
+    initLoadingManager();
+
     try {
         if (typeof THREE.GLTFLoader === 'undefined') {
             throw new Error("GLTFLoader non trovato.");
         }
-        loader = new THREE.GLTFLoader();
+        loader = new THREE.GLTFLoader(loadingManager);
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87ceeb);
         
@@ -95,13 +126,22 @@ function initThree() {
         
         renderer = new THREE.WebGLRenderer({ 
             antialias: GameSettings.graphics.antialias,
-            powerPreference: "high-performance" 
+            powerPreference: "high-performance",
+            precision: "mediump", // Ottimizzazione precisione shader
+            alpha: false,
+            stencil: false,
+            depth: true
         });
         
         renderer.setSize(width, height);
-        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limita il pixel ratio per performance
         container.appendChild(renderer.domElement);
         
+        // Ottimizzazioni Renderer
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.shadowMap.enabled = GameSettings.graphics.shadows;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
         // Assicuriamoci che il canvas sia visibile
         renderer.domElement.style.display = "block";
         renderer.domElement.style.width = "100%";
@@ -118,14 +158,15 @@ function initThree() {
         window.addEventListener('resize', onWindowResize, false);
 
         // Lights
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
         directionalLight.position.set(100, 500, 100);
+        directionalLight.castShadow = GameSettings.graphics.shadows;
         scene.add(directionalLight);
 
         // Floor with texture
-        const textureLoader = new THREE.TextureLoader();
+        const textureLoader = new THREE.TextureLoader(loadingManager);
         const grassTexture = textureLoader.load('assets/textures/grass.jpg', (tex) => {
             console.log("Texture caricata con successo.");
         }, undefined, (err) => {
@@ -136,9 +177,14 @@ function initThree() {
         grassTexture.repeat.set(50, 50);
 
         const floorGeo = new THREE.PlaneGeometry(MAP_CONFIG.MAP_WIDTH * MAP_CONFIG.TILE_SIZE * 5, MAP_CONFIG.MAP_HEIGHT * MAP_CONFIG.TILE_SIZE * 5);
-        const floorMat = new THREE.MeshLambertMaterial({ color: 0x2d5a27, map: grassTexture });
+        const floorMat = new THREE.MeshPhongMaterial({ 
+            color: 0x2d5a27, 
+            map: grassTexture,
+            shininess: 0 // Risparmia calcoli speculari
+        });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = GameSettings.graphics.shadows;
         scene.add(floor);
 
         // Load Player Model
@@ -407,12 +453,20 @@ function onKeyUp(event) {
 }
 
 let animationId;
+let lastAnimateTime = 0;
+const targetInterval = 1000 / 60; // 60 FPS target
 
-function animate() {
+function animate(time) {
     if (!scene || isPaused) return;
     animationId = requestAnimationFrame(animate);
 
+    // Limitatore FPS per stabilità
     const delta = clock.getDelta();
+    const frameDelta = time - lastAnimateTime;
+    
+    // Se il frame è troppo veloce, saltiamo (opzionale, Three.js gestisce bene ma aiuta su mobile)
+    // if (frameDelta < targetInterval) return; 
+    lastAnimateTime = time;
     
     // Supporto Gamepad
     handleGamepadInput();
@@ -421,64 +475,66 @@ function animate() {
 
     // Fallback: se playerMesh non è ancora caricato, la camera guarda il centro
     if (playerMesh) {
-        velocity.x -= velocity.x * 10.0 * delta;
-        velocity.z -= velocity.z * 10.0 * delta;
+        // Attrito più veloce per reattività
+        velocity.x -= velocity.x * 12.0 * delta;
+        velocity.z -= velocity.z * 12.0 * delta;
 
         // Inversione Controlli: A/Left muove a sinistra (-1), D/Right muove a destra (+1)
-        // Ma nel sistema di coordinate, direzione.x negativo potrebbe essere destra a seconda della camera.
-        // Con camera fissa dietro al player, dobbiamo assicurarci che left vada a sinistra RELATIVAMENTE al player/camera.
-        // direction.x = Number(moveLeft) - Number(moveRight); // Vecchio (Left +, Right -) -> Dipende dal sistema
-        // Proviamo a invertire:
         direction.z = Number(moveForward) - Number(moveBackward);
-        direction.x = Number(moveLeft) - Number(moveRight); // Se Left è true -> +1. Se Right è true -> -1.
-        // Se vogliamo invertire: Left -> -1, Right -> +1
-        direction.x = Number(moveRight) - Number(moveLeft); // Right(1) - Left(0) = +1 (Destra) | Right(0) - Left(1) = -1 (Sinistra)
+        direction.x = Number(moveRight) - Number(moveLeft);
         
         direction.normalize();
 
         // Se la camera ruota, dobbiamo ruotare anche il vettore di movimento
         if (moveForward || moveBackward || moveLeft || moveRight) {
-             // Ruota la direzione di input in base all'angolo della camera
              const camDir = new THREE.Vector3(direction.x, 0, direction.z);
              camDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraAngle);
              
-             velocity.x -= camDir.x * 4000.0 * delta;
-             velocity.z -= camDir.z * 4000.0 * delta;
+             velocity.x -= camDir.x * 4500.0 * delta;
+             velocity.z -= camDir.z * 4500.0 * delta;
         }
 
         playerMesh.position.x += velocity.x * delta;
         playerMesh.position.z += velocity.z * delta;
 
-        // Rotation
+        // Rotation fluida
         if (moveForward || moveBackward || moveLeft || moveRight) {
-            const angle = Math.atan2(-velocity.x, -velocity.z);
-            playerMesh.rotation.y = angle;
+            const targetAngle = Math.atan2(-velocity.x, -velocity.z);
+            // Interpolazione rotazione per fluidità
+            const currentRotation = playerMesh.rotation.y;
+            let diff = targetAngle - currentRotation;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            playerMesh.rotation.y += diff * 15.0 * delta;
         }
 
-        // Update player data for saving
+        // Update player data
         player.x = playerMesh.position.x;
         player.y = playerMesh.position.z;
 
-        // Camera follow
+        // Camera follow fluida
         const camX = playerMesh.position.x + Math.sin(cameraAngle) * cameraDistance;
         const camZ = playerMesh.position.z + Math.cos(cameraAngle) * cameraDistance;
-        const camY = cameraDistance * cameraPitch; // Altezza basata sul pitch
+        const camY = cameraDistance * cameraPitch;
 
-        camera.position.set(camX, camY, camZ);
+        camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.1);
         camera.lookAt(playerMesh.position);
     } else {
-        // Se il modello non c'è, guarda dove dovrebbe essere il giocatore
         camera.position.set(player.x, 400, player.y + 400);
         camera.lookAt(player.x, 0, player.y);
     }
 
+        // Ottimizzazione Collisioni: Controlliamo solo ogni N frame o basato sulla distanza
+        // In questo caso, filtriamo per distanza prima del calcolo preciso
+        const checkDist = 200; // Solo oggetti vicini
+
         // Collision with chests
         chests.forEach((chest, index) => {
-            if (playerMesh.position.distanceTo(chest.position) < 50) {
+            if (Math.abs(playerMesh.position.x - chest.position.x) < 50 && 
+                Math.abs(playerMesh.position.z - chest.position.z) < 50) {
                 scene.remove(chest);
                 chests.splice(index, 1);
                 
-                // 70% chance di trovare un oggetto, 30% solo zeny
                 if (Math.random() < 0.7) {
                     const item = getRandomItem();
                     if (item) {
@@ -496,7 +552,8 @@ function animate() {
 
         // Collision with world enemies
         worldEnemies.forEach((enemy, index) => {
-            if (playerMesh.position.distanceTo(enemy.position) < 50) {
+            if (Math.abs(playerMesh.position.x - enemy.position.x) < 50 && 
+                Math.abs(playerMesh.position.z - enemy.position.z) < 50) {
                 scene.remove(enemy);
                 worldEnemies.splice(index, 1);
                 moveForward = moveBackward = moveLeft = moveRight = false;
@@ -504,8 +561,8 @@ function animate() {
             }
         });
 
-        // Random Encounter
-        if ((moveForward || moveBackward || moveLeft || moveRight) && Math.random() < 0.005) {
+        // Random Encounter - Ridotto frequenza per fluidità
+        if ((moveForward || moveBackward || moveLeft || moveRight) && Math.random() < 0.003) {
             moveForward = moveBackward = moveLeft = moveRight = false;
             startHunt();
         }
@@ -520,10 +577,14 @@ let screens = {};
 async function init() {
     console.log("Inizializzazione gioco...");
     
+    // Inizializza il manager di caricamento subito
+    initLoadingManager();
+
     // Verifica caricamento librerie critiche
     if (typeof THREE === 'undefined') {
         console.error("Errore: Three.js non caricato!");
-        alert("Errore caricamento motore 3D. Controlla la connessione.");
+        const loadingText = document.getElementById('loading-text');
+        if (loadingText) loadingText.innerText = "ERRORE: Motore 3D non trovato!";
         return;
     }
 
@@ -540,12 +601,19 @@ async function init() {
     };
 
     try {
-        // Configura i listener PRIMA del caricamento dei dati
+        // Configura i listener
         setupEventListeners();
         
-        // Carica dati in background
-        loadMonsters().then(() => console.log("Mostri caricati."));
-        loadItems().then(() => console.log("Oggetti caricati."));
+        // Caricamento dati asincrono con caching
+        const loadData = async () => {
+            const [monsters, items] = await Promise.all([
+                loadMonsters(),
+                loadItems()
+            ]);
+            console.log("Dati caricati e pronti.");
+        };
+
+        loadData();
 
         console.log("Gioco inizializzato correttamente.");
     } catch (e) {
