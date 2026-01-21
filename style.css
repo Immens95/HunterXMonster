@@ -24,7 +24,6 @@ body {
 
 #game-container {
     width: 95vw;
-    max-width: 800px;
     height: 90vh;
     background-color: var(--rpg-blue);
     border: 4px double var(--rpg-border);
@@ -33,6 +32,14 @@ body {
     box-shadow: 0 0 0 4px var(--rpg-blue), 0 0 0 8px var(--rpg-border);
     display: flex;
     flex-direction: column;
+    position: relative;
+}
+
+#game-screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     position: relative;
 }
 
@@ -78,6 +85,7 @@ header h1 {
     position: relative;
     overflow: hidden;
     animation: fadeIn 0.3s ease-out;
+    z-index: 10;
 }
 
 @keyframes fadeIn {
@@ -90,12 +98,18 @@ header h1 {
     position: relative;
     border: 2px solid var(--rpg-border);
     overflow: hidden;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    touch-action: none;
 }
 
 #three-container {
     width: 100%;
     height: 100%;
-    overflow: hidden;
+    position: absolute;
+    top: 0;
+    left: 0;
 }
 
 #three-container canvas {
@@ -263,11 +277,59 @@ button:hover::before {
 }
 
 /* Character Menu */
-#character-screen {
+#character-screen, #inventory-screen {
     background: var(--rpg-blue);
     padding: 20px;
     border: 2px solid var(--rpg-border);
     font-size: 0.7rem;
+}
+
+.scrollable-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    margin: 10px 0;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px inset var(--rpg-border);
+}
+
+.inventory-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    margin-bottom: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--rpg-border);
+}
+
+.item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.item-name {
+    color: var(--rpg-gold);
+    font-size: 0.7rem;
+}
+
+.item-desc {
+    font-size: 0.5rem;
+    opacity: 0.8;
+}
+
+.use-btn {
+    padding: 5px 10px;
+    font-size: 0.6rem;
+    text-align: center;
+}
+
+.empty-msg {
+    text-align: center;
+    opacity: 0.6;
+    margin-top: 20px;
+    font-size: 0.6rem;
 }
 
 .stat-row {
@@ -290,30 +352,40 @@ button:hover::before {
     padding: 5px;
 }
 
-/* Joystick per Mobile */
-#mobile-controls {
-    display: none;
+#joystick-container {
     position: absolute;
-    bottom: 20px;
-    left: 20px;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 5px;
+    bottom: 50px;
+    left: 50px;
+    width: 120px;
+    height: 120px;
+    z-index: 1000;
+    touch-action: none;
+    user-select: none;
 }
 
-@media (max-width: 600px) {
-    #mobile-controls {
-        display: grid;
-    }
-    header h1 { font-size: 0.9rem; }
-    #stats-bar { font-size: 0.5rem; }
-}
-
-.control-btn {
-    width: 40px;
-    height: 40px;
+#joystick-base {
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 4px double rgba(255, 255, 255, 0.5);
+    border-radius: 50%;
     display: flex;
     justify-content: center;
     align-items: center;
-    background: rgba(255,255,255,0.2);
-    border: 1px solid white;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+
+#joystick-stick {
+    width: 50px;
+    height: 50px;
+    background: var(--rpg-gold);
+    border: 2px solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(0,0,0,0.8);
+    transition: transform 0.05s linear;
+}
+
+@media (max-width: 600px) {
+    header h1 { font-size: 0.9rem; }
+    #stats-bar { font-size: 0.5rem; }
 }

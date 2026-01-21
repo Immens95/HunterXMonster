@@ -33,6 +33,14 @@
             <!-- Esplorazione 3D (Three.js) -->
             <div id="exploration-screen" class="screen hidden">
                 <div id="three-container"></div>
+                
+                <!-- Joystick Virtuale per Mobile -->
+                <div id="joystick-container" class="hidden">
+                    <div id="joystick-base">
+                        <div id="joystick-stick"></div>
+                    </div>
+                </div>
+
                 <div class="game-ui-overlay">
                     <button id="pause-btn">Pausa (ESC)</button>
                 </div>
@@ -43,11 +51,22 @@
                 <h2>Pausa</h2>
                 <div class="menu-options">
                     <button id="resume-btn">Riprendi</button>
+                    <button id="inventory-btn">Inventario</button>
+                    <button id="char-menu-btn">Stato Personaggio</button>
                     <button id="settings-btn">Impostazioni</button>
                     <button id="pause-save-btn">Salva Partita</button>
                     <button id="pause-load-btn">Carica Partita</button>
                     <button id="quit-btn">Esci al Menu</button>
                 </div>
+            </div>
+
+            <!-- Menu Inventario -->
+            <div id="inventory-screen" class="screen hidden">
+                <h2>Inventario</h2>
+                <div id="inventory-list" class="scrollable-list">
+                    <!-- Popolato via JS -->
+                </div>
+                <button class="back-to-pause-btn">Indietro</button>
             </div>
 
             <!-- Menu Impostazioni -->

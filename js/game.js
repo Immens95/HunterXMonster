@@ -23,22 +23,62 @@ let player = {
 // --- 3D Scene Management (Three.js) ---
 let scene, camera, renderer, playerMesh, npcMesh, mixer;
 let chests = [];
+let worldEnemies = [];
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
 let velocity, direction, clock, loader;
 
 let isPaused = false;
+let isTouchDevice = false;
+let cameraAngle = 0;
+let cameraDistance = 600;
+let cameraPitch = 0.8; 
+let joystickData = { active: false, x: 0, y: 0 };
+let lastMousePos = { x: 0, y: 0 };
 
 function initThree() {
     console.log("Inizializzazione Three.js...");
     
-    if (!velocity) velocity = new THREE.Vector3();
-    if (!direction) direction = new THREE.Vector3();
-    if (!clock) clock = new THREE.Clock();
+    // UI Debug temporanea per l'utente
+    const debugStatus = document.createElement('div');
+    debugStatus.id = "three-debug-status";
+    debugStatus.style = "position:absolute; top:50px; left:10px; color:white; background:rgba(0,0,0,0.8); padding:5px; font-size:10px; z-index:10000;";
+    debugStatus.innerText = "Inizializzazione 3D...";
+    document.body.appendChild(debugStatus);
+
+    if (typeof THREE === 'undefined') {
+        debugStatus.innerText = "ERRORE: THREE non definito!";
+        debugStatus.style.background = "red";
+        return;
+    }
     const container = document.getElementById('three-container');
     if (!container) {
         console.error("Container 'three-container' non trovato!");
+        debugStatus.innerText = "ERRORE: Container non trovato!";
         return;
     }
+
+    if (!velocity) velocity = new THREE.Vector3();
+    if (!direction) direction = new THREE.Vector3();
+    if (!clock) clock = new THREE.Clock();
+
+    // Rilevamento Dispositivo Touch
+    isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    console.log("Dispositivo Touch Rilevato:", isTouchDevice);
+
+    if (isTouchDevice) {
+        document.getElementById('joystick-container').classList.remove('hidden');
+        setupJoystick();
+        setupTouchCamera();
+    } else {
+        setupMouseCamera();
+    }
+
+    debugStatus.innerText = "Preparazione renderer...";
+
+    // Forza visibilità container per calcolare dimensioni
+    const width = container.clientWidth || 800;
+    const height = container.clientHeight || 600;
+    console.log(`Dimensioni container: ${width}x${height}`);
 
     if (animationId) cancelAnimationFrame(animationId);
     while (container.firstChild) container.removeChild(container.firstChild);
@@ -49,33 +89,54 @@ function initThree() {
         }
         loader = new THREE.GLTFLoader();
         scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x1a472a);
-        scene.fog = new THREE.FogExp2(0x1a472a, 0.002);
-
-        camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, GameSettings.graphics.lodDistance);
+        scene.background = new THREE.Color(0x87ceeb);
         
-        renderer = new THREE.WebGLRenderer({ antialias: GameSettings.graphics.antialias });
-        GameSettings.apply(renderer, camera);
+        camera = new THREE.PerspectiveCamera(75, width / height, 1, 10000);
+        
+        renderer = new THREE.WebGLRenderer({ 
+            antialias: GameSettings.graphics.antialias,
+            powerPreference: "high-performance" 
+        });
+        
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(window.devicePixelRatio);
         container.appendChild(renderer.domElement);
+        
+        // Assicuriamoci che il canvas sia visibile
+        renderer.domElement.style.display = "block";
+        renderer.domElement.style.width = "100%";
+        renderer.domElement.style.height = "100%";
+
+        // Debug Cube - Per confermare che il rendering funziona
+        const debugGeo = new THREE.BoxGeometry(100, 100, 100);
+        const debugMat = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
+        const debugCube = new THREE.Mesh(debugGeo, debugMat);
+        debugCube.position.set(player.x, 50, player.y);
+        scene.add(debugCube);
+        console.log("Cubo di debug aggiunto alla scena.");
 
         window.addEventListener('resize', onWindowResize, false);
 
         // Lights
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
         scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-        directionalLight.position.set(10, 50, 10);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        directionalLight.position.set(100, 500, 100);
         scene.add(directionalLight);
 
         // Floor with texture
         const textureLoader = new THREE.TextureLoader();
-        const grassTexture = textureLoader.load('assets/textures/grass.jpg');
+        const grassTexture = textureLoader.load('assets/textures/grass.jpg', (tex) => {
+            console.log("Texture caricata con successo.");
+        }, undefined, (err) => {
+            console.warn("Errore caricamento texture grass.jpg, uso colore piatto.");
+        });
         grassTexture.wrapS = THREE.RepeatWrapping;
         grassTexture.wrapT = THREE.RepeatWrapping;
         grassTexture.repeat.set(50, 50);
 
-        const floorGeo = new THREE.PlaneGeometry(MAP_CONFIG.MAP_WIDTH * MAP_CONFIG.TILE_SIZE * 2, MAP_CONFIG.MAP_HEIGHT * MAP_CONFIG.TILE_SIZE * 2);
-        const floorMat = new THREE.MeshLambertMaterial({ map: grassTexture });
+        const floorGeo = new THREE.PlaneGeometry(MAP_CONFIG.MAP_WIDTH * MAP_CONFIG.TILE_SIZE * 5, MAP_CONFIG.MAP_HEIGHT * MAP_CONFIG.TILE_SIZE * 5);
+        const floorMat = new THREE.MeshLambertMaterial({ color: 0x2d5a27, map: grassTexture });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
         scene.add(floor);
@@ -111,6 +172,12 @@ function initThree() {
             spawn3DChest();
         }
 
+        // Enemies in World
+        worldEnemies = [];
+        for(let i=0; i<10; i++) {
+            spawn3DEnemy();
+        }
+
         camera.position.set(player.x, 400, player.y + 400);
         camera.lookAt(player.x, 0, player.y);
 
@@ -121,9 +188,131 @@ function initThree() {
         
         animate();
         console.log("Three.js inizializzato correttamente.");
+        debugStatus.innerText = "3D Pronto!";
+        setTimeout(() => debugStatus.remove(), 3000);
     } catch (e) {
         console.error("Errore durante l'inizializzazione di Three.js:", e);
+        debugStatus.innerText = "ERRORE: " + e.message;
+        debugStatus.style.background = "red";
     }
+}
+
+function setupJoystick() {
+    const container = document.getElementById('joystick-container');
+    const stick = document.getElementById('joystick-stick');
+    const base = document.getElementById('joystick-base');
+    if (!container || !stick || !base) return;
+
+    const limit = 40;
+    
+    const handleMove = (e) => {
+        if (!joystickData.active) return;
+        const touch = e.touches ? Array.from(e.touches).find(t => t.target.closest('#joystick-container')) : e;
+        if (!touch) return;
+
+        const rect = base.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        let dx = touch.clientX - centerX;
+        let dy = touch.clientY - centerY;
+        
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > limit) {
+            dx = (dx / dist) * limit;
+            dy = (dy / dist) * limit;
+        }
+        
+        stick.style.transform = `translate(${dx}px, ${dy}px)`;
+        joystickData.x = dx / limit;
+        joystickData.y = dy / limit;
+        
+        moveLeft = joystickData.x < -0.3;
+        moveRight = joystickData.x > 0.3;
+        moveForward = joystickData.y < -0.3;
+        moveBackward = joystickData.y > 0.3;
+        
+        e.preventDefault();
+    };
+
+    const handleStart = (e) => {
+        joystickData.active = true;
+        handleMove(e);
+    };
+
+    const handleEnd = () => {
+        joystickData.active = false;
+        stick.style.transform = `translate(0, 0)`;
+        joystickData.x = 0;
+        joystickData.y = 0;
+        moveLeft = moveRight = moveForward = moveBackward = false;
+    };
+
+    container.addEventListener('touchstart', handleStart, { passive: false });
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', handleEnd);
+}
+
+function setupTouchCamera() {
+    const container = document.getElementById('three-container');
+    if (!container) return;
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    window.addEventListener('touchstart', (e) => {
+        if (isPaused) return;
+        const touch = e.touches[0];
+        // Se il touch non è sul joystick, iniziamo a ruotare la camera
+        if (!e.target.closest('#joystick-container')) {
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+        }
+    });
+
+    window.addEventListener('touchmove', (e) => {
+        if (isPaused || touchStartX === 0) return;
+        const touch = Array.from(e.touches).find(t => !t.target.closest('#joystick-container'));
+        if (!touch) return;
+
+        const dx = touch.clientX - touchStartX;
+        const dy = touch.clientY - touchStartY;
+
+        cameraAngle -= dx * 0.01;
+        cameraPitch = Math.max(0.2, Math.min(1.4, cameraPitch + dy * 0.01));
+
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+    }, { passive: false });
+
+    window.addEventListener('touchend', () => {
+        touchStartX = 0;
+        touchStartY = 0;
+    });
+}
+
+function setupMouseCamera() {
+    window.addEventListener('mousemove', (e) => {
+        if (isPaused) return;
+        
+        // Se il mouse si muove, ruotiamo la camera (stile libera o con tasto destro)
+        // Per ora facciamo rotazione libera se siamo in esplorazione
+        if (screens.exploration && !screens.exploration.classList.contains('hidden')) {
+            if (lastMousePos.x !== 0) {
+                const dx = e.clientX - lastMousePos.x;
+                const dy = e.clientY - lastMousePos.y;
+                
+                // Opzionale: ruota solo se un tasto è premuto, o sempre
+                // Facciamo ruota sempre se il mouse è nel container
+                if (e.buttons === 1 || e.buttons === 2) { // Click sinistro o destro per ruotare
+                    cameraAngle -= dx * 0.005;
+                    cameraPitch = Math.max(0.2, Math.min(1.4, cameraPitch + dy * 0.005));
+                }
+            }
+            lastMousePos.x = e.clientX;
+            lastMousePos.y = e.clientY;
+        }
+    });
 }
 
 function spawn3DChest() {
@@ -137,6 +326,19 @@ function spawn3DChest() {
     );
     scene.add(chest);
     chests.push(chest);
+}
+
+function spawn3DEnemy() {
+    const geo = new THREE.IcosahedronGeometry(30, 0);
+    const mat = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+    const enemy = new THREE.Mesh(geo, mat);
+    enemy.position.set(
+        (Math.random() - 0.5) * MAP_CONFIG.MAP_WIDTH * MAP_CONFIG.TILE_SIZE * 1.5,
+        30,
+        (Math.random() - 0.5) * MAP_CONFIG.MAP_HEIGHT * MAP_CONFIG.TILE_SIZE * 1.5
+    );
+    scene.add(enemy);
+    worldEnemies.push(enemy);
 }
 
 function handleGamepadInput() {
@@ -180,19 +382,27 @@ function onKeyDown(event) {
     if (isPaused) return;
 
     switch (event.code) {
-        case GameSettings.controls.forward: moveForward = true; break;
-        case GameSettings.controls.left: moveLeft = true; break;
-        case GameSettings.controls.backward: moveBackward = true; break;
-        case GameSettings.controls.right: moveRight = true; break;
+        case GameSettings.controls.forward: 
+        case 'ArrowUp': moveForward = true; break;
+        case GameSettings.controls.left: 
+        case 'ArrowLeft': moveLeft = true; break;
+        case GameSettings.controls.backward: 
+        case 'ArrowDown': moveBackward = true; break;
+        case GameSettings.controls.right: 
+        case 'ArrowRight': moveRight = true; break;
     }
 }
 
 function onKeyUp(event) {
     switch (event.code) {
-        case GameSettings.controls.forward: moveForward = false; break;
-        case GameSettings.controls.left: moveLeft = false; break;
-        case GameSettings.controls.backward: moveBackward = false; break;
-        case GameSettings.controls.right: moveRight = false; break;
+        case GameSettings.controls.forward: 
+        case 'ArrowUp': moveForward = false; break;
+        case GameSettings.controls.left: 
+        case 'ArrowLeft': moveLeft = false; break;
+        case GameSettings.controls.backward: 
+        case 'ArrowDown': moveBackward = false; break;
+        case GameSettings.controls.right: 
+        case 'ArrowRight': moveRight = false; break;
     }
 }
 
@@ -209,16 +419,32 @@ function animate() {
 
     if (mixer) mixer.update(delta);
 
+    // Fallback: se playerMesh non è ancora caricato, la camera guarda il centro
     if (playerMesh) {
         velocity.x -= velocity.x * 10.0 * delta;
         velocity.z -= velocity.z * 10.0 * delta;
 
+        // Inversione Controlli: A/Left muove a sinistra (-1), D/Right muove a destra (+1)
+        // Ma nel sistema di coordinate, direzione.x negativo potrebbe essere destra a seconda della camera.
+        // Con camera fissa dietro al player, dobbiamo assicurarci che left vada a sinistra RELATIVAMENTE al player/camera.
+        // direction.x = Number(moveLeft) - Number(moveRight); // Vecchio (Left +, Right -) -> Dipende dal sistema
+        // Proviamo a invertire:
         direction.z = Number(moveForward) - Number(moveBackward);
-        direction.x = Number(moveLeft) - Number(moveRight); // Corretto: Left e Right erano invertiti per la logica 3D standard
+        direction.x = Number(moveLeft) - Number(moveRight); // Se Left è true -> +1. Se Right è true -> -1.
+        // Se vogliamo invertire: Left -> -1, Right -> +1
+        direction.x = Number(moveRight) - Number(moveLeft); // Right(1) - Left(0) = +1 (Destra) | Right(0) - Left(1) = -1 (Sinistra)
+        
         direction.normalize();
 
-        if (moveForward || moveBackward) velocity.z -= direction.z * 4000.0 * delta;
-        if (moveLeft || moveRight) velocity.x -= direction.x * 4000.0 * delta;
+        // Se la camera ruota, dobbiamo ruotare anche il vettore di movimento
+        if (moveForward || moveBackward || moveLeft || moveRight) {
+             // Ruota la direzione di input in base all'angolo della camera
+             const camDir = new THREE.Vector3(direction.x, 0, direction.z);
+             camDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraAngle);
+             
+             velocity.x -= camDir.x * 4000.0 * delta;
+             velocity.z -= camDir.z * 4000.0 * delta;
+        }
 
         playerMesh.position.x += velocity.x * delta;
         playerMesh.position.z += velocity.z * delta;
@@ -234,19 +460,47 @@ function animate() {
         player.y = playerMesh.position.z;
 
         // Camera follow
-        camera.position.x = playerMesh.position.x;
-        camera.position.z = playerMesh.position.z + 400;
+        const camX = playerMesh.position.x + Math.sin(cameraAngle) * cameraDistance;
+        const camZ = playerMesh.position.z + Math.cos(cameraAngle) * cameraDistance;
+        const camY = cameraDistance * cameraPitch; // Altezza basata sul pitch
+
+        camera.position.set(camX, camY, camZ);
         camera.lookAt(playerMesh.position);
+    } else {
+        // Se il modello non c'è, guarda dove dovrebbe essere il giocatore
+        camera.position.set(player.x, 400, player.y + 400);
+        camera.lookAt(player.x, 0, player.y);
+    }
 
         // Collision with chests
         chests.forEach((chest, index) => {
             if (playerMesh.position.distanceTo(chest.position) < 50) {
                 scene.remove(chest);
                 chests.splice(index, 1);
-                const gold = 100 + Math.floor(Math.random() * 200);
-                player.zeny += gold;
+                
+                // 70% chance di trovare un oggetto, 30% solo zeny
+                if (Math.random() < 0.7) {
+                    const item = getRandomItem();
+                    if (item) {
+                        addToInventory(item);
+                        log(`Hai trovato: ${item.name}!`);
+                    }
+                } else {
+                    const gold = 100 + Math.floor(Math.random() * 200);
+                    player.zeny += gold;
+                    log(`Hai trovato ${gold} Zeny nel forziere!`);
+                }
                 updateUI();
-                console.log(`Raccolto forziere: +${gold} Zeny`);
+            }
+        });
+
+        // Collision with world enemies
+        worldEnemies.forEach((enemy, index) => {
+            if (playerMesh.position.distanceTo(enemy.position) < 50) {
+                scene.remove(enemy);
+                worldEnemies.splice(index, 1);
+                moveForward = moveBackward = moveLeft = moveRight = false;
+                startHunt();
             }
         });
 
@@ -281,19 +535,17 @@ async function init() {
         shop: document.getElementById('shop-screen'),
         character: document.getElementById('character-screen'),
         pause: document.getElementById('pause-screen'),
-        settings: document.getElementById('settings-screen')
+        settings: document.getElementById('settings-screen'),
+        inventory: document.getElementById('inventory-screen')
     };
 
     try {
         // Configura i listener PRIMA del caricamento dei dati
         setupEventListeners();
         
-        // Carica i mostri in background
-        loadMonsters().then(() => {
-            console.log("Mostri caricati correttamente.");
-        }).catch(e => {
-            console.warn("Errore durante il caricamento dei mostri, uso dati di fallback.", e);
-        });
+        // Carica dati in background
+        loadMonsters().then(() => console.log("Mostri caricati."));
+        loadItems().then(() => console.log("Oggetti caricati."));
 
         console.log("Gioco inizializzato correttamente.");
     } catch (e) {
@@ -321,6 +573,15 @@ function setupEventListeners() {
 
     const btnResume = document.getElementById('resume-btn');
     if (btnResume) btnResume.onclick = () => togglePause();
+
+    const btnInventory = document.getElementById('inventory-btn');
+    if (btnInventory) btnInventory.onclick = () => {
+        showScreen('inventory');
+        openInventoryMenu();
+    };
+
+    const btnCharMenu = document.getElementById('char-menu-btn');
+    if (btnCharMenu) btnCharMenu.onclick = openCharacterMenu;
 
     const btnSettings = document.getElementById('settings-btn');
     if (btnSettings) btnSettings.onclick = () => {
