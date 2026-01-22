@@ -25,8 +25,18 @@
         </div>
         
         <header>
-            <h1>Hunter X Monster</h1>
-            <div id="stats-bar">
+            <div class="header-left">
+                <h1>Hunter X Monster</h1>
+            </div>
+            <div class="header-right">
+                <button id="crypto-shop-btn" class="rpg-button small" title="Crypto Shop">
+                    <span class="icon">₿</span>
+                </button>
+                <button id="fullscreen-btn" class="rpg-button small" title="Toggle Fullscreen">
+                    <span class="icon">⛶</span>
+                </button>
+            </div>
+        </header>    <div id="stats-bar">
                 <div class="stat-item"><img src="assets/sprites/heart.png" class="stat-icon"> LV: <span id="player-level">1</span></div>
                 <div class="stat-item">NEN: <span id="player-nen">Nessuno</span></div>
                 <div class="stat-item">ZENY: <span id="player-zeny">0</span></div>
@@ -63,6 +73,7 @@
                 <div class="menu-options">
                     <button id="resume-btn">Riprendi</button>
                     <button id="inventory-btn">Inventario</button>
+                    <button id="bestiary-btn">Bestiario</button>
                     <button id="char-menu-btn">Stato Personaggio</button>
                     <button id="settings-btn">Impostazioni</button>
                     <button id="pause-save-btn">Salva Partita</button>
@@ -76,6 +87,25 @@
                 <h2>Inventario</h2>
                 <div id="inventory-list" class="scrollable-list">
                     <!-- Popolato via JS -->
+                </div>
+                <button class="back-to-pause-btn">Indietro</button>
+            </div>
+
+            <!-- Bestiario (Carte Mostro) -->
+            <div id="bestiary-screen" class="screen hidden">
+                <h2>Bestiario Cacciatore</h2>
+                <div class="bestiary-container">
+                    <div id="bestiary-list" class="scrollable-list">
+                        <!-- Popolato via JS -->
+                    </div>
+                    <div id="bestiary-preview">
+                        <div id="card-3d-view"></div>
+                        <div id="card-details">
+                            <h3 id="card-name-detail">-</h3>
+                            <p id="card-stats-detail">-</p>
+                            <div id="card-abilities-detail"></div>
+                        </div>
+                    </div>
                 </div>
                 <button class="back-to-pause-btn">Indietro</button>
             </div>
@@ -106,17 +136,110 @@
 
             <!-- Battaglia -->
             <div id="hunt-screen" class="screen hidden">
+                <div id="combat-mode-toggle">
+                    <button id="toggle-action-btn" class="active">Action</button>
+                    <button id="toggle-menu-btn">Menu FF</button>
+                </div>
+
                 <div id="monster-info">
                     <h2 id="monster-name">Mostro</h2>
                     <div class="hp-bar-container">
                         <div id="monster-hp" class="hp-bar"></div>
                     </div>
                 </div>
+
+                <!-- HUD Personaggio in Battaglia -->
+                <div id="battle-player-stats">
+                    <div class="stat-bar-group">
+                        <label>HP</label>
+                        <div class="bar-bg"><div id="battle-hp-bar" class="bar-fill hp"></div></div>
+                    </div>
+                    <div class="stat-bar-group">
+                        <label>STAMINA</label>
+                        <div class="bar-bg"><div id="battle-stamina-bar" class="bar-fill stamina"></div></div>
+                    </div>
+                    <div class="stat-bar-group">
+                        <label>AURA</label>
+                        <div class="bar-bg"><div id="battle-aura-bar" class="bar-fill aura"></div></div>
+                    </div>
+                </div>
+
                 <div id="battle-log"></div>
-                <div id="battle-actions">
-                    <button id="attack-btn">Attacca</button>
-                    <button id="nen-btn">Nen Skill</button>
-                    <button id="flee-btn">Fuggi</button>
+
+                <!-- UI Modalità Action -->
+                <div id="action-ui" class="battle-controls">
+                    <div class="action-grid">
+                        <button id="action-attack-btn" class="rpg-button">Attacco Rapido</button>
+                        <button id="action-dodge-btn" class="rpg-button">Schivata</button>
+                        <button id="action-parry-btn" class="rpg-button">Parata</button>
+                        <button id="action-nen-btn" class="rpg-button">Nen Burst</button>
+                    </div>
+                </div>
+
+                <!-- UI Modalità Final Fantasy (Menu) -->
+                <div id="menu-ui" class="battle-controls hidden">
+                    <div id="ff-main-menu" class="ff-menu">
+                        <button data-target="ff-physical-menu">Attacchi Fisici</button>
+                        <button data-target="ff-nen-menu">Attacchi NEN</button>
+                        <button data-target="ff-items-menu">Oggetti</button>
+                        <button data-target="ff-skills-menu">Abilità</button>
+                        <button id="ff-flee-btn">Fuggi</button>
+                    </div>
+
+                    <!-- Sottomenu Fisici -->
+                    <div id="ff-physical-menu" class="ff-submenu hidden">
+                        <button class="back-to-main">Indietro</button>
+                        <div class="submenu-list">
+                            <!-- Popolato via JS: Colpo Critico, Affondo, ecc. -->
+                        </div>
+                    </div>
+
+                    <!-- Sottomenu NEN -->
+                    <div id="ff-nen-menu" class="ff-submenu hidden">
+                        <button class="back-to-main">Indietro</button>
+                        <div class="submenu-list">
+                            <!-- Popolato via JS: Ten, Ren, Zetsu, ecc. -->
+                        </div>
+                    </div>
+
+                    <!-- Sottomenu Oggetti -->
+                    <div id="ff-items-menu" class="ff-submenu hidden">
+                        <button class="back-to-main">Indietro</button>
+                        <div class="submenu-list"></div>
+                    </div>
+
+                    <!-- Sottomenu Abilità -->
+                    <div id="ff-skills-menu" class="ff-submenu hidden">
+                        <button class="back-to-main">Indietro</button>
+                        <div class="submenu-list">
+                            <button id="skill-capture-btn">Cattura Mostro</button>
+                            <button id="skill-summon-btn">Evocazione</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Triple Triad Game -->
+            <div id="triple-triad-screen" class="screen hidden">
+                <div class="triad-container">
+                    <div class="triad-opponent-hand triad-hand"></div>
+                    <div class="triad-board">
+                        <div class="triad-cell" data-index="0"></div>
+                        <div class="triad-cell" data-index="1"></div>
+                        <div class="triad-cell" data-index="2"></div>
+                        <div class="triad-cell" data-index="3"></div>
+                        <div class="triad-cell" data-index="4"></div>
+                        <div class="triad-cell" data-index="5"></div>
+                        <div class="triad-cell" data-index="6"></div>
+                        <div class="triad-cell" data-index="7"></div>
+                        <div class="triad-cell" data-index="8"></div>
+                    </div>
+                    <div class="triad-player-hand triad-hand"></div>
+                    
+                    <div class="triad-controls">
+                        <div id="triad-turn-indicator">Tuo Turno</div>
+                        <button id="triad-quit-btn" class="rpg-button">Abbandona</button>
+                    </div>
                 </div>
             </div>
 
@@ -147,7 +270,10 @@
         </footer>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js" defer></script>
+    <!-- Web3 & Crypto -->
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+    
+    <!-- Game Scripts -->
     <script src="js/lib/three.min.js"></script>
     <script src="js/lib/GLTFLoader.js"></script>
     <script src="js/settings.js"></script>
