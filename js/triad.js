@@ -204,36 +204,48 @@ class TripleTriad {
     placeCard(index, card) {
         card.onBoard = true;
         this.board[index] = card;
-        this.resolveCaptures(index);
         this.render();
+        
+        // Sound effect placeholder
+        // playSound('card_place');
+
+        // Check captures
+        this.checkCaptures(index, card);
     }
 
-    resolveCaptures(index) {
-        const card = this.board[index];
+    checkCaptures(index, card) {
+        const row = Math.floor(index / 3);
+        const col = index % 3;
+        
         const neighbors = [
-            { pos: index - 3, side: 2, oppSide: 0 }, // Up (checks Down of neighbor)
-            { pos: index + 1, side: 1, oppSide: 3 }, // Right (checks Left of neighbor)
-            { pos: index + 3, side: 0, oppSide: 2 }, // Down (checks Up of neighbor)
-            { pos: index - 1, side: 3, oppSide: 1 }  // Left (checks Right of neighbor)
+            { idx: index - 3, side: 0, oppSide: 2, condition: row > 0 }, // Up
+            { idx: index + 1, side: 1, oppSide: 3, condition: col < 2 }, // Right
+            { idx: index + 3, side: 2, oppSide: 0, condition: row < 2 }, // Down
+            { idx: index - 1, side: 3, oppSide: 1, condition: col > 0 }  // Left
         ];
 
-        const isRightEdge = (index % 3 === 2);
-        const isLeftEdge = (index % 3 === 0);
-
+        let capturedAny = false;
         neighbors.forEach(n => {
-            if (n.pos < 0 || n.pos > 8) return;
-            if (n.side === 1 && isRightEdge) return;
-            if (n.side === 3 && isLeftEdge) return;
-            
-            const neighbor = this.board[n.pos];
-            if (neighbor && neighbor.owner !== card.owner) {
-                if (card.values[n.side] > neighbor.values[n.oppSide]) {
-                    neighbor.owner = card.owner; // Capture!
-                    neighbor.captured = true; // Per animazione
-                    setTimeout(() => { neighbor.captured = false; }, 500);
+            if (n.condition && this.board[n.idx] && this.board[n.idx].owner !== card.owner) {
+                const myValue = card.values[n.side];
+                const oppValue = this.board[n.idx].values[n.oppSide];
+                
+                if (myValue > oppValue) {
+                    this.board[n.idx].owner = card.owner;
+                    this.board[n.idx].captured = true;
+                    capturedAny = true;
                 }
             }
         });
+
+        if (capturedAny) {
+            // Re-render after a tiny delay to allow "place" to be seen
+            setTimeout(() => {
+                this.render();
+                // Reset capture flag for next time
+                this.board.forEach(c => { if(c) c.captured = false; });
+            }, 300);
+        }
     }
 
     opponentMove() {

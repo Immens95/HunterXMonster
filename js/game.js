@@ -893,12 +893,16 @@ function initThree() {
         directionalLight.shadow.mapSize.height = 1024;
         scene.add(directionalLight);
 
-        // Floor with texture
+        // Floor with textures
         const textureLoader = new THREE.TextureLoader(loadingManager);
         const grassTexture = textureLoader.load('assets/textures/grass.jpg');
-        grassTexture.wrapS = THREE.RepeatWrapping;
-        grassTexture.wrapT = THREE.RepeatWrapping;
-        grassTexture.repeat.set(100, 100); // Più ripetizioni per texture più fine
+        const rockTexture = textureLoader.load('assets/textures/rock.jpg');
+        const snowTexture = textureLoader.load('assets/textures/snow.jpg');
+        
+        [grassTexture, rockTexture, snowTexture].forEach(tex => {
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+        });
 
         // Terreno Avanzato con Altezze e Biomi
         const terrainSize = MAP_CONFIG.MAP_WIDTH * MAP_CONFIG.TILE_SIZE * 15;
@@ -944,20 +948,41 @@ function initThree() {
 
     const terrainMat = new THREE.MeshStandardMaterial({ 
         vertexColors: true,
-        map: grassTexture,
         roughness: 0.8,
         metalness: 0.1,
         flatShading: false
     });
-    // Miscelazione texture e vertex colors tramite onBeforeCompile (Avanzato)
+
+    // Miscelazione avanzata texture tramite shader injection
     terrainMat.onBeforeCompile = (shader) => {
-        shader.fragmentShader = shader.fragmentShader.replace(
+        shader.uniforms.tGrass = { value: grassTexture };
+        shader.uniforms.tRock = { value: rockTexture };
+        shader.uniforms.tSnow = { value: snowTexture };
+        
+        shader.fragmentShader = `
+            uniform sampler2D tGrass;
+            uniform sampler2D tRock;
+            uniform sampler2D tSnow;
+            ${shader.fragmentShader}
+        `.replace(
             '#include <map_fragment>',
             `
-            #ifdef USE_MAP
-                vec4 texelColor = texture2D( map, vUv );
-                diffuseColor *= texelColor;
-            #endif
+            // Ripetizione texture indipendente
+            vec2 uvErba = vUv * 60.0;
+            vec2 uvRoccia = vUv * 40.0;
+            vec2 uvNeve = vUv * 30.0;
+
+            vec4 grass = texture2D(tGrass, uvErba);
+            vec4 rock = texture2D(tRock, uvRoccia);
+            vec4 snow = texture2D(tSnow, uvNeve);
+            
+            // Logica di miscelazione basata sui vertex colors
+            float snowWeight = smoothstep(0.8, 0.95, vColor.r * vColor.g * vColor.b);
+            float rockWeight = smoothstep(0.4, 0.6, vColor.r) * (1.0 - snowWeight);
+            float grassWeight = 1.0 - snowWeight - rockWeight;
+            
+            vec4 texColor = (grass * grassWeight) + (rock * rockWeight) + (snow * snowWeight);
+            diffuseColor *= texColor;
             `
         );
     };
@@ -1020,14 +1045,28 @@ function initThree() {
 function initPlayerMesh() {
     loader.load('assets/models/player.glb', (gltf) => {
         playerMesh = gltf.scene;
-        playerMesh.scale.set(40, 40, 40);
+        playerMesh.scale.set(30, 30, 30);
         const y = window.getTerrainHeight ? window.getTerrainHeight(player.x, player.y) : 0;
         playerMesh.position.set(player.x, y, player.y);
+        
+        // Attiva ombre per il player
+        playerMesh.traverse(child => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+
         scene.add(playerMesh);
         
         if (gltf.animations && gltf.animations.length > 0) {
             mixer = new THREE.AnimationMixer(playerMesh);
-            mixer.clipAction(gltf.animations[0]).play();
+            // RobotExpressive ha diverse animazioni, usiamo la 6 (Walking) o la 10 (Idle)
+            // Proviamo a cercare "Walking" o "Idle"
+            let action = mixer.clipAction(gltf.animations[0]);
+            const walkClip = gltf.animations.find(a => a.name.toLowerCase().includes('walk'));
+            if (walkClip) action = mixer.clipAction(walkClip);
+            action.play();
         }
     }, undefined, (error) => {
         console.warn("Fallback player mesh: modello non trovato.");
@@ -1048,7 +1087,24 @@ function initNPCMesh() {
         const nz = 15 * MAP_CONFIG.TILE_SIZE;
         const ny = window.getTerrainHeight ? window.getTerrainHeight(nx, nz) : 0;
         npcMesh.position.set(nx, ny, nz);
+        
+        // Attiva ombre per l'NPC
+        npcMesh.traverse(child => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+
         scene.add(npcMesh);
+
+        if (gltf.animations && gltf.animations.length > 0) {
+            const npcMixer = new THREE.AnimationMixer(npcMesh);
+            npcMixer.clipAction(gltf.animations[0]).play();
+            // Aggiungiamo il mixer dell'NPC a una lista se vogliamo animarlo
+            if (!window.mixers) window.mixers = [];
+            window.mixers.push(npcMixer);
+        }
     }, undefined, (error) => {
         console.warn("Fallback NPC mesh: modello non trovato.");
         const geo = new THREE.CapsuleGeometry(15, 30, 4, 8);
@@ -1182,7 +1238,7 @@ function setupMouseCamera() {
 
 function spawnEnvironment() {
     const range = 7000;
-    const count = 450; // Aumentato ulteriormente
+    const count = 500; // Aumentato ulteriormente
     
     for (let i = 0; i < count; i++) {
         const x = (Math.random() - 0.5) * range;
@@ -1195,9 +1251,11 @@ function spawnEnvironment() {
             spawnTree(x, z);
         } else if (rand > 0.75) {
             spawnRock(x, z);
-        } else if (rand > 0.70) {
+        } else if (rand > 0.72) {
+            spawnLantern(x, z);
+        } else if (rand > 0.68) {
             spawnCrystal(x, z);
-        } else if (rand > 0.65) {
+        } else if (rand > 0.63) {
             spawnRuins(x, z);
         } else if (rand > 0.4) {
             spawnBush(x, z);
@@ -1205,6 +1263,37 @@ function spawnEnvironment() {
             spawnFlower(x, z);
         }
     }
+}
+
+function spawnLantern(x, z) {
+    loader.load('assets/models/props/lantern.glb', (gltf) => {
+        const lantern = gltf.scene;
+        lantern.scale.set(10, 10, 10);
+        const y = window.getTerrainHeight ? window.getTerrainHeight(x, z) : 0;
+        lantern.position.set(x, y + 5, z);
+        lantern.castShadow = true;
+        scene.add(lantern);
+        
+        // Luce calda per la lanterna
+        const light = new THREE.PointLight(0xffaa00, 1.5, 150);
+        light.position.set(x, y + 25, z);
+        scene.add(light);
+        
+        // Effetto bagliore
+        const flareGeo = new THREE.SphereGeometry(2, 8, 8);
+        const flareMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+        const flare = new THREE.Mesh(flareGeo, flareMat);
+        flare.position.set(x, y + 25, z);
+        scene.add(flare);
+    }, undefined, () => {
+        // Fallback
+        const geo = new THREE.CylinderGeometry(5, 5, 20);
+        const mat = new THREE.MeshPhongMaterial({ color: 0x333333 });
+        const lantern = new THREE.Mesh(geo, mat);
+        const y = window.getTerrainHeight ? window.getTerrainHeight(x, z) : 0;
+        lantern.position.set(x, y + 10, z);
+        scene.add(lantern);
+    });
 }
 
 function spawnCrystal(x, z) {
@@ -1232,10 +1321,18 @@ function spawnCrystal(x, z) {
 function spawnRuins(x, z) {
     loader.load('assets/models/environment/box.glb', (gltf) => {
         const ruins = gltf.scene;
-        ruins.scale.set(30, 30, 30);
+        ruins.scale.set(60, 60, 60);
         const y = window.getTerrainHeight ? window.getTerrainHeight(x, z) : 0;
-        ruins.position.set(x, y, z);
+        ruins.position.set(x, y + 20, z);
         ruins.rotation.y = Math.random() * Math.PI;
+        
+        ruins.traverse(child => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+
         scene.add(ruins);
     }, undefined, () => {
         // Fallback
@@ -1318,11 +1415,19 @@ function spawnFlower(x, z) {
 function spawnTree(x, z) {
     loader.load('assets/models/environment/tree.glb', (gltf) => {
         const tree = gltf.scene;
-        tree.scale.set(40, 40, 40);
+        // BoomBox è un modello piccolo, scalamolo molto
+        tree.scale.set(80, 80, 80);
         const y = window.getTerrainHeight ? window.getTerrainHeight(x, z) : 0;
-        tree.position.set(x, y, z);
+        tree.position.set(x, y + 20, z);
         tree.rotation.y = Math.random() * Math.PI;
-        tree.castShadow = true;
+        
+        tree.traverse(child => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+
         scene.add(tree);
     }, undefined, () => {
         // Fallback
@@ -1350,10 +1455,18 @@ function spawnTree(x, z) {
 function spawnRock(x, z) {
     loader.load('assets/models/environment/rock.glb', (gltf) => {
         const rock = gltf.scene;
-        rock.scale.set(30, 30, 30);
+        rock.scale.set(50, 50, 50);
         const y = window.getTerrainHeight ? window.getTerrainHeight(x, z) : 0;
-        rock.position.set(x, y, z);
+        rock.position.set(x, y + 10, z);
         rock.rotation.set(Math.random(), Math.random(), Math.random());
+        
+        rock.traverse(child => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+
         scene.add(rock);
     }, undefined, () => {
         // Fallback
@@ -1395,11 +1508,20 @@ function spawn3DEnemy() {
     
     loader.load(modelPath, (gltf) => {
         const enemy = gltf.scene;
-        enemy.scale.set(40, 40, 40);
+        // Duck è piccola, Golem è grande
+        const scale = modelPath.includes('duck') ? 50 : 30;
+        enemy.scale.set(scale, scale, scale);
+        
+        enemy.traverse(child => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
         
         setupEnemyMesh(enemy, isLux);
-    }, undefined, () => {
-        // Fallback alla geometria base se il modello non carica
+    }, undefined, (error) => {
+        console.warn("Fallback alla geometria base per nemico.");
         const geo = new THREE.IcosahedronGeometry(30, 0);
         const mat = new THREE.MeshPhongMaterial({ 
             color: isLux ? 0x00ffff : 0xff0000,
@@ -1612,6 +1734,9 @@ function animate(time) {
     handleGamepadInput();
 
     if (mixer) mixer.update(delta);
+    if (window.mixers) {
+        window.mixers.forEach(m => m.update(delta));
+    }
 
     // Rigenerazione Statistiche
     if (!isPaused) {
