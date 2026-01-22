@@ -213,7 +213,7 @@ class TripleTriad {
         this.checkCaptures(index, card);
     }
 
-    checkCaptures(index, card) {
+    checkCaptures(index, card, isCombo = false) {
         const row = Math.floor(index / 3);
         const col = index % 3;
         
@@ -225,26 +225,60 @@ class TripleTriad {
         ];
 
         let capturedAny = false;
+        let sameRuleMatches = [];
+        let comboCards = [];
+
         neighbors.forEach(n => {
-            if (n.condition && this.board[n.idx] && this.board[n.idx].owner !== card.owner) {
+            if (n.condition && this.board[n.idx]) {
+                const neighbor = this.board[n.idx];
                 const myValue = card.values[n.side];
-                const oppValue = this.board[n.idx].values[n.oppSide];
+                const oppValue = neighbor.values[n.oppSide];
                 
-                if (myValue > oppValue) {
-                    this.board[n.idx].owner = card.owner;
-                    this.board[n.idx].captured = true;
+                // Regola Base: Valore maggiore
+                if (neighbor.owner !== card.owner && myValue > oppValue) {
+                    neighbor.owner = card.owner;
+                    neighbor.captured = true;
                     capturedAny = true;
+                    if (!isCombo) comboCards.push({ idx: n.idx, card: neighbor });
+                }
+                
+                // Preparazione per Regola "SAME" (Solo per la mossa iniziale, non in combo)
+                if (!isCombo && myValue === oppValue) {
+                    sameRuleMatches.push({ idx: n.idx, card: neighbor });
                 }
             }
         });
 
-        if (capturedAny) {
-            // Re-render after a tiny delay to allow "place" to be seen
+        // Applicazione Regola "SAME"
+        if (!isCombo && sameRuleMatches.length >= 2) {
+            sameRuleMatches.forEach(match => {
+                if (match.card.owner !== card.owner) {
+                    match.card.owner = card.owner;
+                    match.card.captured = true;
+                    capturedAny = true;
+                    comboCards.push(match);
+                    console.log("SAME Rule Triggered!");
+                }
+            });
+        }
+
+        // Regola "COMBO": Se hai catturato tramite SAME o se hai catturato una carta,
+        // quella carta può catturare i suoi vicini se i suoi valori sono superiori.
+        if (comboCards.length > 0) {
             setTimeout(() => {
-                this.render();
-                // Reset capture flag for next time
+                comboCards.forEach(combo => {
+                    this.checkCaptures(combo.idx, combo.card, true);
+                });
+            }, 150);
+        }
+
+        if (capturedAny) {
+            this.render();
+            // Reset capture flag for visual effect after a delay
+            setTimeout(() => {
                 this.board.forEach(c => { if(c) c.captured = false; });
-            }, 300);
+                this.render();
+            }, 500);
         }
     }
 

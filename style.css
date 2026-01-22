@@ -90,6 +90,7 @@ h1 {
     text-transform: uppercase;
     background: linear-gradient(to right, #fff, var(--rpg-gold));
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -454,6 +455,7 @@ canvas {
     color: rgba(255, 255, 255, 0.1);
     font-weight: bold;
 }
+.triad-card:hover {
     transform: translateY(-5px) scale(1.05);
     z-index: 10;
 }

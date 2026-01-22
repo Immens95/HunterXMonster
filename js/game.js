@@ -173,9 +173,24 @@ function openCryptoShop() {
 }
 
 function log(msg) {
-    const status = document.getElementById('crypto-status');
-    if (status) status.innerText = msg;
-    console.log(msg);
+    const logEl = document.getElementById('battle-log');
+    const cryptoStatus = document.getElementById('crypto-status');
+    
+    if (logEl) {
+        logEl.innerHTML += `<p>> ${msg}</p>`;
+        const messages = logEl.querySelectorAll('p');
+        if (messages.length > 50) logEl.removeChild(messages[0]);
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+    
+    if (cryptoStatus) {
+        cryptoStatus.innerText = msg;
+    }
+    
+    // Log in console solo se non è un messaggio di battaglia ripetitivo
+    if (!msg.includes('danni') && !msg.includes('stamina')) {
+        console.log("GameLog:", msg);
+    }
 }
 
 function updateUI() {
@@ -737,7 +752,13 @@ function initLoadingManager() {
     const loadingScreen = document.getElementById('loading-screen');
 
     loadingManager.onStart = (url, itemsLoaded, itemsTotal) => {
-        console.log(`Inizio caricamento: ${url}. Caricati ${itemsLoaded}/${itemsTotal} elementi.`);
+        // Silenziato per evitare spam nei log, attivo solo per debug pesante
+        // console.log(`Inizio caricamento: ${url}. Caricati ${itemsLoaded}/${itemsTotal} elementi.`);
+        if (loadingScreen) {
+            loadingScreen.classList.remove('hidden');
+            loadingScreen.style.display = 'flex';
+            loadingScreen.style.opacity = '1';
+        }
     };
 
     loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
@@ -768,6 +789,14 @@ function initThree() {
     debugStatus.style = "position:absolute; top:50px; left:10px; color:white; background:rgba(0,0,0,0.8); padding:5px; font-size:10px; z-index:10000;";
     debugStatus.innerText = "Inizializzazione 3D...";
     document.body.appendChild(debugStatus);
+
+    // Prompt di interazione
+    const interactPrompt = document.createElement('div');
+    interactPrompt.id = "interact-prompt";
+    interactPrompt.className = "hidden";
+    interactPrompt.style = "position:absolute; bottom:20%; left:50%; transform:translateX(-50%); color:white; background:rgba(0,0,0,0.7); padding:10px 20px; border-radius:5px; z-index:10000; pointer-events:none; border: 2px solid var(--accent-color);";
+    interactPrompt.innerHTML = "Premi <span style='color:var(--accent-color)'>[E]</span> per interagire";
+    document.body.appendChild(interactPrompt);
 
     if (typeof THREE === 'undefined') {
         debugStatus.innerText = "ERRORE: THREE non definito!";
@@ -895,11 +924,32 @@ function initThree() {
 
         // Floor with textures
         const textureLoader = new THREE.TextureLoader(loadingManager);
-        const grassTexture = textureLoader.load('assets/textures/grass.jpg');
-        const rockTexture = textureLoader.load('assets/textures/rock.jpg');
-        const snowTexture = textureLoader.load('assets/textures/snow.jpg');
         
-        [grassTexture, rockTexture, snowTexture].forEach(tex => {
+        // Funzione per caricare con fallback
+        const loadTexture = (path, fallbackColor) => {
+            return textureLoader.load(path, undefined, undefined, (err) => {
+                console.warn(`Texture ${path} non trovata, uso fallback colore.`);
+                const canvas = document.createElement('canvas');
+                canvas.width = 64; canvas.height = 64;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = fallbackColor;
+                ctx.fillRect(0, 0, 64, 64);
+                // Aggiungi un po' di rumore per non essere piatto
+                ctx.fillStyle = 'rgba(0,0,0,0.1)';
+                for(let i=0; i<100; i++) ctx.fillRect(Math.random()*64, Math.random()*64, 2, 2);
+                const tex = new THREE.CanvasTexture(canvas);
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                return tex;
+            });
+        };
+
+        const grassTexture = loadTexture('assets/textures/grass.jpg', '#3a7d32');
+        const rockTexture = loadTexture('assets/textures/rock.jpg', '#7d5c3d');
+        const snowTexture = loadTexture('assets/textures/snow.jpg', '#ffffff');
+        const sandTexture = loadTexture('assets/textures/sand.jpg', '#c2b280');
+        const mudTexture = loadTexture('assets/textures/mud.jpg', '#4d3319');
+        
+        [grassTexture, rockTexture, snowTexture, sandTexture, mudTexture].forEach(tex => {
             tex.wrapS = THREE.RepeatWrapping;
             tex.wrapT = THREE.RepeatWrapping;
         });
@@ -933,9 +983,13 @@ function initThree() {
             color.setHex(0xffffff); // Neve (Punte più alte)
         } else if (height > 120) {
             color.setHex(0x7d5c3d); // Roccia/Montagna
-        } else if (height > -20) {
+        } else if (height > 20) {
             color.setHex(0x3a7d32); // Erba rigogliosa
-        } else if (height > -100) {
+        } else if (height > -10) {
+            color.setHex(0xc2b280); // Sabbia (Zona costiera/spiaggia)
+        } else if (height > -60) {
+            color.setHex(0x4d3319); // Fango/Terra umida (Mud)
+        } else if (height > -120) {
             color.setHex(0x1a4a1a); // Sottobosco scuro
         } else {
             color.setHex(0x0a2f0a); // Palude/Zone d'ombra
@@ -958,11 +1012,15 @@ function initThree() {
         shader.uniforms.tGrass = { value: grassTexture };
         shader.uniforms.tRock = { value: rockTexture };
         shader.uniforms.tSnow = { value: snowTexture };
+        shader.uniforms.tSand = { value: sandTexture };
+        shader.uniforms.tMud = { value: mudTexture };
         
         shader.fragmentShader = `
             uniform sampler2D tGrass;
             uniform sampler2D tRock;
             uniform sampler2D tSnow;
+            uniform sampler2D tSand;
+            uniform sampler2D tMud;
             ${shader.fragmentShader}
         `.replace(
             '#include <map_fragment>',
@@ -971,17 +1029,26 @@ function initThree() {
             vec2 uvErba = vUv * 60.0;
             vec2 uvRoccia = vUv * 40.0;
             vec2 uvNeve = vUv * 30.0;
+            vec2 uvSabbia = vUv * 50.0;
+            vec2 uvMud = vUv * 45.0;
 
             vec4 grass = texture2D(tGrass, uvErba);
             vec4 rock = texture2D(tRock, uvRoccia);
             vec4 snow = texture2D(tSnow, uvNeve);
+            vec4 sand = texture2D(tSand, uvSabbia);
+            vec4 mud = texture2D(tMud, uvMud);
             
             // Logica di miscelazione basata sui vertex colors
+            // r, g, b rappresentano i pesi basati sul colore assegnato sopra
             float snowWeight = smoothstep(0.8, 0.95, vColor.r * vColor.g * vColor.b);
             float rockWeight = smoothstep(0.4, 0.6, vColor.r) * (1.0 - snowWeight);
-            float grassWeight = 1.0 - snowWeight - rockWeight;
             
-            vec4 texColor = (grass * grassWeight) + (rock * rockWeight) + (snow * snowWeight);
+            // Per sabbia e mud usiamo i canali colore come riferimento
+            float sandWeight = smoothstep(0.6, 0.8, vColor.r * vColor.g) * (1.0 - snowWeight - rockWeight);
+            float mudWeight = smoothstep(0.2, 0.4, vColor.r) * (1.0 - snowWeight - rockWeight - sandWeight);
+            float grassWeight = 1.0 - snowWeight - rockWeight - sandWeight - mudWeight;
+            
+            vec4 texColor = (grass * grassWeight) + (rock * rockWeight) + (snow * snowWeight) + (sand * sandWeight) + (mud * mudWeight);
             diffuseColor *= texColor;
             `
         );
@@ -1625,6 +1692,7 @@ function onKeyDown(event) {
         case 'ArrowDown': moveBackward = true; break;
         case GameSettings.controls.right: 
         case 'ArrowRight': moveRight = true; break;
+        case 'KeyE': interact(); break;
     }
 }
 
@@ -1716,6 +1784,43 @@ function spawnAllyMonster(card) {
     log(`${card.name} ti accompagna nell'esplorazione!`);
     
     // Animazione di "seguito" semplice nel loop animate
+}
+
+let currentInteractTarget = null;
+
+function checkInteractions(delta) {
+    if (!playerMesh || !npcMesh) return;
+    
+    const dist = playerMesh.position.distanceTo(npcMesh.position);
+    const prompt = document.getElementById('interact-prompt');
+    
+    if (dist < 100) {
+        currentInteractTarget = { type: 'npc', mesh: npcMesh };
+        if (prompt) prompt.classList.remove('hidden');
+    } else {
+        if (currentInteractTarget?.mesh === npcMesh) {
+            currentInteractTarget = null;
+            if (prompt) prompt.classList.add('hidden');
+        }
+    }
+}
+
+function interact() {
+    if (!currentInteractTarget) return;
+    
+    if (currentInteractTarget.type === 'npc') {
+        interactNPC();
+    }
+}
+
+function interactNPC() {
+    if (confirm("Vuoi sfidare l'NPC a Triple Triad?")) {
+        if (window.tripleTriad) {
+            window.tripleTriad.startMatch();
+        } else {
+            console.error("Triple Triad non inizializzato!");
+        }
+    }
 }
 
 function animate(time) {
@@ -1814,6 +1919,9 @@ function animate(time) {
 
         camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.1);
         camera.lookAt(playerMesh.position);
+
+        // Controllo Prossimità NPC/Interazione
+        checkInteractions(delta);
 
         // Seguito Alleato (Monster Card)
         if (combatState.currentAlly) {
@@ -1918,7 +2026,18 @@ async function init() {
 
         loadData();
 
-        console.log("Gioco inizializzato correttamente.");
+    
+    // Force hide loading screen after initialization
+    const loadingScreen = document.getElementById('loading-screen');
+    if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        setTimeout(() => {
+            loadingScreen.classList.add('hidden');
+            loadingScreen.style.display = 'none'; // Ensure it's removed from layout
+        }, 500);
+    }
+    
+    console.log("Gioco inizializzato correttamente.");
     } catch (e) {
         console.error("Errore durante l'inizializzazione del gioco:", e);
     }
@@ -1936,7 +2055,7 @@ function togglePause() {
 }
 
 function setupEventListeners() {
-    console.log("Configurazione event listeners...");
+    // console.log("Configurazione event listeners...");
     
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
@@ -2130,6 +2249,7 @@ function showScreen(name) {
 }
 
 function updateUI() {
+    // console.log("Aggiornamento UI...");
     const lvl = document.getElementById('player-level');
     const nen = document.getElementById('player-nen');
     const zeny = document.getElementById('player-zeny');
@@ -2163,7 +2283,16 @@ function levelUp() {
 
 function log(msg) {
     const logEl = document.getElementById('battle-log');
+    if (!logEl) return;
+    
     logEl.innerHTML += `<p>> ${msg}</p>`;
+    
+    // Limita il numero di messaggi nel log per evitare rallentamenti (max 50)
+    const messages = logEl.querySelectorAll('p');
+    if (messages.length > 50) {
+        logEl.removeChild(messages[0]);
+    }
+    
     logEl.scrollTop = logEl.scrollHeight;
 }
 
