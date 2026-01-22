@@ -1,34 +1,24 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap');
 
+/* Modern UI Overhaul */
 :root {
-    --glass-bg: rgba(20, 20, 30, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.1);
+    --rpg-blue: rgba(10, 20, 40, 0.85);
+    --rpg-border: rgba(255, 255, 255, 0.2);
+    --rpg-gold: #ffcc00;
     --accent-color: #00d2ff;
-    --accent-glow: rgba(0, 210, 255, 0.5);
-    --rpg-gold: #f1c40f;
-    --text-main: #e0e0e0;
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.1);
 }
 
 body {
-    margin: 0;
-    padding: 0;
-    font-family: 'Inter', sans-serif;
-    background-color: #0a0a0f;
-    color: var(--text-main);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
+    background: #050505;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     overflow: hidden;
 }
 
 #game-container {
-    width: 100vw;
-    height: 100vh;
-    background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a0f 100%);
-    display: flex;
-    flex-direction: column;
-    position: relative;
+    background: radial-gradient(circle at center, #111 0%, #000 100%);
 }
 
 .rpg-button {
@@ -54,23 +44,19 @@ body {
 }
 
 header {
-    background: rgba(10, 10, 15, 0.8);
-    backdrop-filter: blur(15px);
-    padding: 15px 25px;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--glass-border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    z-index: 100;
+    padding: 15px 30px;
 }
 
-header h1 {
-    font-size: 1.4rem;
-    font-weight: 700;
-    background: linear-gradient(45deg, var(--accent-color), #3a7bd5);
+h1 {
+    font-weight: 300;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    background: linear-gradient(to right, #fff, var(--rpg-gold));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    margin: 0;
 }
 
 .stat-bar-group {
@@ -95,6 +81,9 @@ header h1 {
 .bar-fill.hp { background: linear-gradient(90deg, #ff416c, #ff4b2b); }
 .bar-fill.stamina { background: linear-gradient(90deg, #00b09b, #96c93d); }
 .bar-fill.aura { background: linear-gradient(90deg, #00d2ff, #3a7bd5); }
+
+main {
+    flex-grow: 1;
     position: relative;
     overflow: hidden;
     animation: fadeIn 0.3s ease-out;
@@ -106,15 +95,49 @@ header h1 {
     to { opacity: 1; transform: translateY(0); }
 }
 
-#exploration-screen {
-    background-color: #000;
-    position: relative;
-    border: 2px solid var(--rpg-border);
-    overflow: hidden;
-    height: 100%;
+/* Loading Screen */
+#loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
     width: 100%;
+    height: 100%;
+    background: #000;
     display: flex;
-    touch-action: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    transition: opacity 0.5s;
+}
+
+.loading-content {
+    text-align: center;
+    width: 300px;
+}
+
+#loading-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(255,255,255,0.1);
+    margin: 20px 0;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+#loading-bar-fill {
+    width: 0%;
+    height: 100%;
+    background: var(--rpg-gold);
+    box-shadow: 0 0 10px var(--rpg-gold);
+    transition: width 0.3s;
+}
+
+#exploration-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: hidden;
 }
 
 #three-container {
@@ -256,93 +279,144 @@ canvas {
     display: flex;
     justify-content: center;
     align-items: center;
+    backdrop-filter: blur(10px);
 }
 
 .triad-container {
     display: grid;
-    grid-template-rows: 120px 1fr 120px 60px;
-    gap: 20px;
-    width: 90%;
-    max-width: 500px;
-    height: 90%;
+    grid-template-rows: 100px 1fr 100px 60px;
+    gap: 15px;
+    width: 95%;
+    max-width: 450px;
+    height: 95%;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 20px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
 }
 
 .triad-hand {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     justify-content: center;
     padding: 10px;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(0, 0, 0, 0.2);
     border-radius: 12px;
+    overflow-x: auto;
 }
 
 .triad-board {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: repeat(3, 1fr);
-    gap: 8px;
+    gap: 10px;
     aspect-ratio: 1;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 8px;
-    border-radius: 8px;
-    border: 2px solid var(--accent-color);
+    background: rgba(0, 0, 0, 0.4);
+    padding: 10px;
+    border-radius: 15px;
+    border: 2px solid rgba(0, 210, 255, 0.3);
 }
 
 .triad-cell {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
     display: flex;
     justify-content: center;
     align-items: center;
-    transition: background 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .triad-cell:hover {
-    background: rgba(0, 210, 255, 0.1);
+    background: rgba(0, 210, 255, 0.15);
+    border-color: rgba(0, 210, 255, 0.5);
+    transform: scale(1.02);
 }
 
 .triad-card {
-    width: 70px;
-    height: 100px;
-    background: #2a2a3a;
-    border-radius: 6px;
+    width: 65px;
+    height: 90px;
+    border-radius: 10px;
     position: relative;
-    border: 2px solid #444;
     cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     user-select: none;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.triad-card.player { border-color: var(--accent-color); box-shadow: 0 0 10px var(--accent-glow); }
-.triad-card.opponent { border-color: #ff416c; box-shadow: 0 0 10px rgba(255, 65, 108, 0.5); }
+.triad-card:hover {
+    transform: translateY(-5px) scale(1.05);
+    z-index: 10;
+}
+
+.triad-card.player { 
+    box-shadow: 0 0 15px rgba(0, 210, 255, 0.4);
+    border-color: var(--accent-color);
+}
+
+.triad-card.opponent { 
+    box-shadow: 0 0 15px rgba(255, 65, 108, 0.4);
+    border-color: #ff416c;
+}
+
+.triad-card.captured {
+    animation: captureFlip 0.6s ease-in-out;
+}
+
+@keyframes captureFlip {
+    0% { transform: rotateY(0deg); }
+    50% { transform: rotateY(90deg) scale(1.2); }
+    100% { transform: rotateY(0deg); }
+}
+
+.card-inner {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 5px;
+    box-sizing: border-box;
+}
 
 .card-values {
-    position: absolute;
-    top: 5px;
-    left: 5px;
     display: grid;
     grid-template-areas: ". t ." "l . r" ". b .";
-    font-size: 12px;
-    font-weight: bold;
+    font-size: 14px;
+    font-weight: 900;
     color: white;
+    text-shadow: 1px 1px 2px black;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px;
+    border-radius: 4px;
+    width: fit-content;
 }
 
-.v-up { grid-area: t; }
-.v-left { grid-area: l; }
-.v-right { grid-area: r; }
-.v-down { grid-area: b; }
+.card-name {
+    font-size: 8px;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 4px;
+    padding: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 .triad-controls {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 0 10px;
 }
 
 #triad-turn-indicator {
+    font-size: 1.2rem;
     font-weight: bold;
-    color: var(--accent-color);
-    text-shadow: 0 0 10px var(--accent-glow);
+    text-transform: uppercase;
+    letter-spacing: 2px;
 }
 
 /* Utilities */
@@ -515,41 +589,30 @@ button:hover::before {
 }
 
 #battle-player-stats {
-    background: rgba(0, 0, 0, 0.5);
-    padding: 10px;
-    border: 2px solid var(--rpg-border);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.stat-bar-group {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.stat-bar-group label {
-    font-size: 0.5rem;
-    color: var(--rpg-gold);
+    bottom: 30px;
+    right: 30px;
+    width: 300px;
+    background: rgba(0,0,0,0.7);
+    border-radius: 20px;
+    padding: 20px;
+    border: 1px solid rgba(255,255,255,0.1);
+    backdrop-filter: blur(15px);
 }
 
 .bar-bg {
-    width: 100%;
-    height: 10px;
-    background: #222;
-    border: 1px solid #444;
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.05);
+    border: none;
 }
 
 .bar-fill {
-    height: 100%;
-    width: 100%;
-    transition: width 0.3s steps(10);
+    border-radius: 4px;
 }
 
-.bar-fill.hp { background: #ff4d4d; }
-.bar-fill.stamina { background: #4dff4d; }
-.bar-fill.aura { background: #4da6ff; }
+.bar-fill.hp { background: linear-gradient(90deg, #f85032, #e73827); }
+.bar-fill.stamina { background: linear-gradient(90deg, #1d976c, #93f9b9); }
+.bar-fill.aura { background: linear-gradient(90deg, #2193b0, #6dd5ed); }
 
 .battle-controls {
     flex: 1;
@@ -758,7 +821,189 @@ button:hover::before {
     background: rgba(255, 215, 0, 0.1);
 }
 
+/* Triple Triad Modern Styles */
+#triple-triad-screen {
+    background: radial-gradient(circle, #1a2a6c, #b21f1f, #fdbb2d);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.triad-container {
+    display: grid;
+    grid-template-columns: 150px 1fr 150px;
+    gap: 30px;
+    width: 90%;
+    max-width: 1000px;
+    height: 80vh;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(15px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.triad-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 10px;
+    aspect-ratio: 1 / 1;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px;
+    border-radius: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.triad-cell {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px dashed rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.triad-cell:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: var(--rpg-gold);
+}
+
+.triad-hand {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.triad-card {
+    position: relative;
+    width: 100px;
+    height: 140px;
+    background: linear-gradient(135deg, #2c3e50, #000000);
+    border-radius: 10px;
+    border: 2px solid #555;
+    cursor: pointer;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s;
+    user-select: none;
+    overflow: hidden;
+}
+
+.triad-card:hover {
+    transform: scale(1.05) translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+    z-index: 10;
+}
+
+.triad-card.selected {
+    border-color: var(--rpg-gold);
+    box-shadow: 0 0 20px var(--rpg-gold);
+    transform: scale(1.1);
+}
+
+.triad-card.player { border-color: #3498db; }
+.triad-card.opponent { border-color: #e74c3c; }
+
+.triad-card.on-board {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+}
+
+.card-values {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    display: grid;
+    grid-template-areas: 
+        ". up ."
+        "left . right"
+        ". down .";
+    gap: 2px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 5px;
+    border-radius: 5px;
+    font-weight: bold;
+    font-size: 14px;
+    color: white;
+}
+
+.v-up { grid-area: up; text-align: center; }
+.v-right { grid-area: right; }
+.v-down { grid-area: down; text-align: center; }
+.v-left { grid-area: left; }
+
+.card-name {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    padding: 5px 0;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    font-size: 10px;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.triad-controls {
+    grid-column: 1 / span 3;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 20px;
+}
+
+#triad-turn-indicator {
+    font-size: 1.5rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px rgba(255,255,255,0.5);
+}
+
+/* Modern Glassmorphism Buttons */
+.rpg-button {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-family: inherit;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.rpg-button:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: var(--rpg-gold);
+    transform: translateY(-2px);
+}
+
+.rpg-button.active {
+    background: var(--rpg-gold);
+    color: black;
+    font-weight: bold;
+}
+
+/* Animations */
+@keyframes capturePulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); box-shadow: 0 0 30px white; }
+    100% { transform: scale(1); }
+}
+
+.captured {
+    animation: capturePulse 0.5s ease-out;
+}
+
 @media (max-width: 600px) {
     header h1 { font-size: 0.9rem; }
     #stats-bar { font-size: 0.5rem; }
 }
+

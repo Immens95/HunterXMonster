@@ -141,20 +141,38 @@ class TripleTriad {
     createCardElement(card, isPlayer) {
         const el = document.createElement('div');
         el.className = `triad-card ${isPlayer ? 'player' : 'opponent'}`;
+        if (card.captured) el.classList.add('captured');
         
-        // Se è dell'avversario e non è sul tabellone, nascondi i valori (opzionale)
+        // Se è dell'avversario e non è sul tabellone, nascondi i valori (stile FF8)
         const showValues = isPlayer || card.onBoard;
         
+        // Determina colore sfondo in base al tipo (se esistente) o nome
+        const cardColor = this.getCardColor(card.name);
+        
         el.innerHTML = `
-            <div class="card-values">
-                <div class="v-up">${card.values[0]}</div>
-                <div class="v-right">${card.values[1]}</div>
-                <div class="v-down">${card.values[2]}</div>
-                <div class="v-left">${card.values[3]}</div>
+            <div class="card-inner" style="width:100%;height:100%;background:radial-gradient(circle at 30% 30%, ${cardColor} 0%, #000 100%);">
+                <div class="card-values" style="${showValues ? '' : 'display:none;'}">
+                    <div class="v-up">${card.values[0] === 10 ? 'A' : card.values[0]}</div>
+                    <div class="v-right">${card.values[1] === 10 ? 'A' : card.values[1]}</div>
+                    <div class="v-down">${card.values[2] === 10 ? 'A' : card.values[2]}</div>
+                    <div class="v-left">${card.values[3] === 10 ? 'A' : card.values[3]}</div>
+                </div>
+                <div class="card-name">${card.name}</div>
             </div>
-            <div class="card-name" style="position:absolute;bottom:5px;width:100%;text-align:center;font-size:8px;">${card.name}</div>
         `;
         return el;
+    }
+
+    getCardColor(name) {
+        const colors = {
+            "Slime": "#00ff00",
+            "Wolf": "#888888",
+            "Bat": "#440044",
+            "Dragon": "#ff0000",
+            "Golem": "#8b4513",
+            "Duck": "#ffff00"
+        };
+        return colors[name] || "#3498db";
     }
 
     renderBoard() {
@@ -199,7 +217,6 @@ class TripleTriad {
             { pos: index - 1, side: 3, oppSide: 1 }  // Left (checks Right of neighbor)
         ];
 
-        // Valid neighbors constraints
         const isRightEdge = (index % 3 === 2);
         const isLeftEdge = (index % 3 === 0);
 
@@ -212,6 +229,8 @@ class TripleTriad {
             if (neighbor && neighbor.owner !== card.owner) {
                 if (card.values[n.side] > neighbor.values[n.oppSide]) {
                     neighbor.owner = card.owner; // Capture!
+                    neighbor.captured = true; // Per animazione
+                    setTimeout(() => { neighbor.captured = false; }, 500);
                 }
             }
         });
@@ -220,20 +239,66 @@ class TripleTriad {
     opponentMove() {
         if (this.isGameOver) return;
         
-        // IA Semplice: trova il primo spazio vuoto e gioca la prima carta disponibile
+        // IA Migliorata: Valuta le mosse migliori
         const emptyCells = this.board.map((v, i) => v === null ? i : null).filter(v => v !== null);
         const availableCards = this.opponentHand.filter(c => !c.onBoard);
         
         if (emptyCells.length > 0 && availableCards.length > 0) {
-            const cellIndex = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-            const card = availableCards[0];
-            this.placeCard(cellIndex, card);
+            let bestMove = { cell: emptyCells[0], card: availableCards[0], score: -1 };
+            
+            for (let cellIndex of emptyCells) {
+                for (let card of availableCards) {
+                    let score = this.evaluateMove(cellIndex, card);
+                    if (score > bestMove.score) {
+                        bestMove = { cell: cellIndex, card: card, score: score };
+                    }
+                }
+            }
+            
+            this.placeCard(bestMove.cell, bestMove.card);
         }
 
         if (!this.checkGameOver()) {
             this.turn = 'player';
             this.updateTurnIndicator();
         }
+    }
+
+    evaluateMove(index, card) {
+        let score = 0;
+        const neighbors = [
+            { pos: index - 3, side: 0, oppSide: 2 }, // Up
+            { pos: index + 1, side: 1, oppSide: 3 }, // Right
+            { pos: index + 3, side: 2, oppSide: 0 }, // Down
+            { pos: index - 1, side: 3, oppSide: 1 }  // Left
+        ];
+
+        const isRightEdge = (index % 3 === 2);
+        const isLeftEdge = (index % 3 === 0);
+
+        neighbors.forEach(n => {
+            if (n.pos < 0 || n.pos > 8) return;
+            if (n.side === 1 && isRightEdge) return;
+            if (n.side === 3 && isLeftEdge) return;
+
+            const neighbor = this.board[n.pos];
+            if (neighbor) {
+                if (neighbor.owner === 'player') {
+                    // Possiamo catturarla?
+                    if (card.values[n.side] > neighbor.values[n.oppSide]) {
+                        score += 10;
+                    }
+                } else {
+                    // Proteggiamo la nostra? (Meno importante)
+                    score += 1;
+                }
+            } else {
+                // Spazio vuoto: meglio avere valori alti verso l'esterno
+                score += card.values[n.side] * 0.5;
+            }
+        });
+
+        return score;
     }
 
     updateTurnIndicator() {
@@ -255,24 +320,41 @@ class TripleTriad {
 
     calculateResult() {
         let pScore = this.board.filter(c => c.owner === 'player').length;
-        // Aggiungi carte rimaste in mano (standard TT rules)
         pScore += this.playerHand.filter(c => !c.onBoard).length;
-        
         const oScore = 10 - pScore;
         
-        let msg = `Fine Partita! Giocatore: ${pScore} - Avversario: ${oScore}\n`;
+        const resultOverlay = document.createElement('div');
+        resultOverlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 10000;
+            backdrop-filter: blur(10px); animation: fadeIn 0.5s;
+        `;
+        
+        let title = "PAREGGIO!";
+        let color = "#fff";
         if (pScore > 5) {
-            msg += "HAI VINTO!";
-            player.zeny += 500;
+            title = "VITTORIA!";
+            color = "var(--accent-color)";
+            player.zeny += 1000;
         } else if (pScore < 5) {
-            msg += "HAI PERSO...";
-        } else {
-            msg += "PAREGGIO!";
+            title = "SCONFITTA...";
+            color = "#ff416c";
         }
         
-        alert(msg);
-        updateUI();
-        showScreen('exploration');
+        resultOverlay.innerHTML = `
+            <h1 style="color: ${color}; font-size: 3rem; text-shadow: 0 0 20px ${color};">${title}</h1>
+            <p style="font-size: 1.5rem; margin: 20px 0;">Punteggio: ${pScore} - ${oScore}</p>
+            <button class="use-btn" style="padding: 15px 40px; font-size: 1.2rem;">CONTINUA</button>
+        `;
+        
+        document.body.appendChild(resultOverlay);
+        
+        resultOverlay.querySelector('button').onclick = () => {
+            resultOverlay.remove();
+            updateUI();
+            showScreen('exploration');
+        };
     }
 }
 

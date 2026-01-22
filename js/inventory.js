@@ -40,7 +40,10 @@ function openInventoryMenu() {
                     <span class="item-name">🎴 ${card.name}</span>
                     <span class="item-desc">ATK: ${card.stats.atk} | HP: ${card.stats.hp}</span>
                 </div>
-                <button class="use-btn" onclick="summonMonsterOutside(${index})">EVOCA</button>
+                <div class="card-actions" style="display:flex; gap:5px;">
+                    <button class="use-btn" onclick="summonMonsterOutside(${index})">EVOCA</button>
+                    <button class="use-btn" onclick="window.tripleTriad.startMatch()">CARTE</button>
+                </div>
             `;
             invList.appendChild(cardDiv);
         });
