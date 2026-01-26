@@ -1,13 +1,20 @@
-const CACHE_NAME = 'hxm-v2';
+
+const CACHE_NAME = 'hxm-v3';
 const ASSETS = [
     './',
     './index.html',
     './style.css',
-    './js/game.js',
-    './js/pwa.js',
+    './manifest.json',
     './js/lib/three.min.js',
     './js/lib/GLTFLoader.js',
-    './manifest.json'
+    './src/main.js',
+    './src/core/Game.js',
+    './src/core/GameState.js',
+    './src/rendering/SceneManager.js',
+    './src/rendering/Terrain.js',
+    './src/assets/AssetManager.js',
+    './src/systems/InputManager.js',
+    './src/systems/Player.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -23,7 +30,6 @@ self.addEventListener('activate', (event) => {
             return Promise.all(
                 cacheNames.map((cacheName) => {
                     if (cacheName !== CACHE_NAME) {
-                        console.log('Cancellazione vecchia cache:', cacheName);
                         return caches.delete(cacheName);
                     }
                 })
@@ -34,7 +40,14 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
     event.respondWith(
-        caches.match(event.request)
-            .then((response) => response || fetch(event.request))
+        caches.match(event.request).then((cachedResponse) => {
+            const fetchPromise = fetch(event.request).then((networkResponse) => {
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put(event.request, networkResponse.clone());
+                });
+                return networkResponse;
+            });
+            return cachedResponse || fetchPromise;
+        })
     );
 });
